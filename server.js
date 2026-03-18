@@ -267,6 +267,17 @@ function operatorContactMessage() {
   ].join('\n');
 }
 
+function shouldReturnToMenuOnNextMessage(state) {
+  return [
+    STATES.REITERATION_CONFIRMATION,
+    STATES.REGISTER_HELP,
+    STATES.CLAIM_TUTORIAL,
+    STATES.SYSTEM_PROBLEM,
+    STATES.PHONE_SUPPORT,
+    STATES.FALLBACK
+  ].includes(state);
+}
+
 function processMessage(userId, rawText) {
   const text = normalizeInput(rawText);
   const session = getSession(userId);
@@ -281,6 +292,11 @@ function processMessage(userId, rawText) {
     return welcomeMessage();
   }
 
+  if (shouldReturnToMenuOnNextMessage(session.state)) {
+    setState(userId, STATES.MAIN_MENU);
+    return showMainMenu();
+  }
+
   switch (session.state) {
     case STATES.MAIN_MENU:
       return handleMainMenu(userId, text);
@@ -288,21 +304,10 @@ function processMessage(userId, rawText) {
       return handleClaimNew(userId, text);
     case STATES.CLAIM_REITERATION:
       return handleClaimReiteration(userId, text);
-    case STATES.REITERATION_CONFIRMATION:
-      setState(userId, STATES.FALLBACK);
-      return fallbackMessage();
     case STATES.MUNIDIGITAL_HELP:
       return handleMuniDigitalHelp(userId, text);
-    case STATES.REGISTER_HELP:
-    case STATES.CLAIM_TUTORIAL:
-    case STATES.SYSTEM_PROBLEM:
-    case STATES.PHONE_SUPPORT:
-      setState(userId, STATES.FALLBACK);
-      return fallbackMessage();
     case STATES.OPERATOR_CONTACT:
       return handleOperatorContact(userId, text);
-    case STATES.FALLBACK:
-      return fallbackMessage();
     default:
       setState(userId, STATES.MAIN_MENU);
       return showMainMenu();
