@@ -1,4 +1,5 @@
 const express = require('express');
+const fs = require('fs');
 const path = require('path');
 
 const app = express();
@@ -6,10 +7,9 @@ app.use(express.json());
 
 const PORT = Number(process.env.PORT || 3000);
 const WHATSAPP_ENABLED = process.env.WHATSAPP_ENABLED === 'true';
-const WHATSAPP_AUTH_DIR = process.env.WHATSAPP_AUTH_DIR || path.join(__dirname, '.baileys_auth');
-const WHATSAPP_PAIRING_NUMBER = normalizePhoneNumber(process.env.WHATSAPP_PAIRING_NUMBER || '');
+const WHATSAPP_AUTH_DIR = process.env.WHATSAPP_AUTH_DIR || path.join(__dirname, '.wwebjs_auth');
 const WHATSAPP_PRINT_QR = process.env.WHATSAPP_PRINT_QR !== 'false';
-const WHATSAPP_USE_PAIRING_CODE = Boolean(WHATSAPP_PAIRING_NUMBER);
+const WHATSAPP_BROWSER_PATH = process.env.WHATSAPP_BROWSER_PATH || findBrowserExecutable();
 
 const STATES = {
   WELCOME: 'WELCOME',
@@ -34,10 +34,9 @@ const whatsappRuntime = {
   enabled: WHATSAPP_ENABLED,
   status: WHATSAPP_ENABLED ? 'booting' : 'disabled',
   authDir: WHATSAPP_AUTH_DIR,
-  lastConnectionUpdate: null,
   lastQrAt: null,
-  lastPairingCode: null,
-  socket: null
+  lastClientEvent: null,
+  client: null
 };
 
 function getSession(userId) {
@@ -79,8 +78,21 @@ function normalizeInput(text = '') {
   return String(text).trim();
 }
 
-function normalizePhoneNumber(value = '') {
-  return String(value).replace(/\D+/g, '');
+function findBrowserExecutable() {
+  const candidates = [
+    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
+  ];
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return '';
 }
 
 function isMenuCommand(text = '') {
@@ -409,195 +421,143 @@ function handleOperatorContact(userId, text) {
   ].join('\n');
 }
 
-function extractMessageText(message) {
-  if (!message) {
-    return '';
-  }
-
-  if (message.conversation) {
-    return message.conversation;
-  }
-
-  if (message.extendedTextMessage?.text) {
-    return message.extendedTextMessage.text;
-  }
-
-  if (message.imageMessage?.caption) {
-    return message.imageMessage.caption;
-  }
-
-  if (message.videoMessage?.caption) {
-    return message.videoMessage.caption;
-  }
-
-  if (message.buttonsResponseMessage?.selectedButtonId) {
-    return message.buttonsResponseMessage.selectedButtonId;
-  }
-
-  if (message.listResponseMessage?.singleSelectReply?.selectedRowId) {
-    return message.listResponseMessage.singleSelectReply.selectedRowId;
-  }
-
-  if (message.templateButtonReplyMessage?.selectedId) {
-    return message.templateButtonReplyMessage.selectedId;
-  }
-
-  return '';
-}
-
 async function startWhatsAppBridge() {
   if (!WHATSAPP_ENABLED) {
     return;
   }
 
-  let makeWASocket;
-  let useMultiFileAuthState;
-  let DisconnectReason;
-  let Browsers;
-  let pino;
+  let Client;
+  let LocalAuth;
   let qrcode;
 
   try {
-    ({ default: makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers } = await import('@whiskeysockets/baileys'));
-    ({ default: pino } = await import('pino'));
+    ({ Client, LocalAuth } = require('whatsapp-web.js'));
 
     if (WHATSAPP_PRINT_QR) {
       ({ default: qrcode } = await import('qrcode-terminal'));
     }
   } catch (error) {
     whatsappRuntime.status = 'dependency_error';
-    console.error('No se pudo iniciar Baileys. Instala sus dependencias primero.', error);
+    console.error('No se pudo iniciar whatsapp-web.js. Instala sus dependencias primero.', error);
     return;
   }
 
-  const { state, saveCreds } = await useMultiFileAuthState(WHATSAPP_AUTH_DIR);
-  let pairingCodeRequested = false;
-
-  const sock = makeWASocket({
-    auth: state,
-    logger: pino({ level: 'silent' }),
-    browser: Browsers.macOS('Google Chrome'),
-    markOnlineOnConnect: false,
-    getMessage: async () => undefined
+  const client = new Client({
+    authStrategy: new LocalAuth({
+      dataPath: WHATSAPP_AUTH_DIR
+    }),
+    puppeteer: {
+      headless: true,
+      executablePath: WHATSAPP_BROWSER_PATH || undefined,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    }
   });
 
-  whatsappRuntime.socket = sock;
+  whatsappRuntime.client = client;
   whatsappRuntime.status = 'connecting';
 
-  sock.ev.on('creds.update', saveCreds);
-
-  if (WHATSAPP_USE_PAIRING_CODE && !state.creds.registered) {
-    pairingCodeRequested = true;
-    try {
-      const code = await sock.requestPairingCode(WHATSAPP_PAIRING_NUMBER);
-      whatsappRuntime.lastPairingCode = code;
-      whatsappRuntime.status = 'pairing_code_ready';
-      console.log(`Codigo de vinculacion: ${code}`);
-    } catch (error) {
-      pairingCodeRequested = false;
-      whatsappRuntime.status = 'pairing_code_error';
-      console.error('No se pudo solicitar el codigo de vinculacion:', error.message);
-    }
+  if (WHATSAPP_BROWSER_PATH) {
+    console.log(`Usando navegador local: ${WHATSAPP_BROWSER_PATH}`);
+  } else {
+    console.log('No se encontro Chrome o Edge local. Puppeteer intentara usar su cache.');
   }
 
-  sock.ev.on('connection.update', async (update) => {
-    const { connection, lastDisconnect, qr } = update;
-
-    whatsappRuntime.lastConnectionUpdate = {
-      connection: connection || null,
-      timestamp: new Date().toISOString(),
-      hasQr: Boolean(qr)
+  client.on('qr', (qr) => {
+    whatsappRuntime.status = 'qr_pending';
+    whatsappRuntime.lastQrAt = new Date().toISOString();
+    whatsappRuntime.lastClientEvent = {
+      type: 'qr',
+      timestamp: whatsappRuntime.lastQrAt
     };
 
-    if (qr && !WHATSAPP_USE_PAIRING_CODE) {
-      whatsappRuntime.status = 'qr_pending';
-      whatsappRuntime.lastQrAt = new Date().toISOString();
-
-      if (qrcode) {
-        qrcode.generate(qr, { small: true });
-      }
-    }
-
-    if (connection === 'open') {
-      whatsappRuntime.status = 'connected';
-      console.log('WhatsApp conectado.');
-      return;
-    }
-
-    if (connection === 'close') {
-      const statusCode = lastDisconnect?.error?.output?.statusCode;
-      const shouldReconnect =
-        statusCode !== 405 &&
-        statusCode !== DisconnectReason.loggedOut &&
-        statusCode !== DisconnectReason.restartRequired;
-
-      console.error(`WhatsApp cerro la conexion. statusCode=${statusCode ?? 'unknown'}`);
-
-      if (statusCode === DisconnectReason.restartRequired) {
-        whatsappRuntime.status = 'restarting';
-        console.log('WhatsApp requiere reinicio de socket. Reconectando...');
-        startWhatsAppBridge().catch((error) => {
-          console.error('Error reiniciando WhatsApp:', error);
-        });
-        return;
-      }
-
-      if (shouldReconnect) {
-        whatsappRuntime.status = 'reconnecting';
-        console.log('WhatsApp desconectado. Intentando reconectar...');
-        startWhatsAppBridge().catch((error) => {
-          console.error('Error reconectando WhatsApp:', error);
-        });
-        return;
-      }
-
-      if (statusCode === 405) {
-        whatsappRuntime.status = 'pairing_not_allowed';
-        console.error('WhatsApp rechazo este metodo de vinculacion. Proba limpiando la sesion y usando QR en lugar de codigo.');
-        return;
-      }
-
-      whatsappRuntime.status = 'logged_out';
-      console.error('WhatsApp cerro sesion. Hace falta volver a vincular el dispositivo.');
+    console.log('QR recibido. Escanealo desde WhatsApp > Dispositivos vinculados.');
+    if (qrcode) {
+      qrcode.generate(qr, { small: true });
     }
   });
 
-  sock.ev.on('messages.upsert', async ({ messages, type }) => {
-    if (type !== 'notify') {
+  client.on('loading_screen', (percent, message) => {
+    whatsappRuntime.status = 'loading';
+    whatsappRuntime.lastClientEvent = {
+      type: 'loading_screen',
+      timestamp: new Date().toISOString(),
+      percent,
+      message
+    };
+    console.log(`WhatsApp cargando: ${percent}% ${message}`);
+  });
+
+  client.on('authenticated', () => {
+    whatsappRuntime.status = 'authenticated';
+    whatsappRuntime.lastClientEvent = {
+      type: 'authenticated',
+      timestamp: new Date().toISOString()
+    };
+    console.log('WhatsApp autenticado.');
+  });
+
+  client.on('ready', () => {
+    whatsappRuntime.status = 'connected';
+    whatsappRuntime.lastClientEvent = {
+      type: 'ready',
+      timestamp: new Date().toISOString()
+    };
+    console.log('WhatsApp conectado.');
+  });
+
+  client.on('auth_failure', (message) => {
+    whatsappRuntime.status = 'auth_failure';
+    whatsappRuntime.lastClientEvent = {
+      type: 'auth_failure',
+      timestamp: new Date().toISOString(),
+      message
+    };
+    console.error(`Fallo de autenticacion de WhatsApp: ${message}`);
+  });
+
+  client.on('disconnected', (reason) => {
+    whatsappRuntime.status = 'disconnected';
+    whatsappRuntime.lastClientEvent = {
+      type: 'disconnected',
+      timestamp: new Date().toISOString(),
+      reason: String(reason)
+    };
+    console.error(`WhatsApp desconectado: ${reason}`);
+  });
+
+  client.on('message', async (incoming) => {
+    console.log(`Mensaje entrante desde ${incoming.from}. fromMe=${incoming.fromMe} body="${normalizeInput(incoming.body)}"`);
+
+    if (incoming.fromMe) {
       return;
     }
 
-    for (const incoming of messages) {
-      if (!incoming.message) {
-        continue;
-      }
+    if (incoming.from === 'status@broadcast' || incoming.from.endsWith('@g.us')) {
+      console.log(`Mensaje ignorado de ${incoming.from}`);
+      return;
+    }
 
-      if (incoming.key?.fromMe) {
-        continue;
-      }
+    const text = normalizeInput(incoming.body);
+    if (!text) {
+      console.log(`Mensaje sin texto util desde ${incoming.from}`);
+      return;
+    }
 
-      const remoteJid = incoming.key?.remoteJid || '';
-      if (!remoteJid || remoteJid === 'status@broadcast' || remoteJid.endsWith('@g.us')) {
-        continue;
-      }
+    const reply = processMessage(incoming.from, text);
+    if (!reply) {
+      console.log(`Sin respuesta generada para ${incoming.from}`);
+      return;
+    }
 
-      const text = normalizeInput(extractMessageText(incoming.message));
-      if (!text) {
-        continue;
-      }
-
-      const reply = processMessage(remoteJid, text);
-      if (!reply) {
-        continue;
-      }
-
-      try {
-        await sock.sendMessage(remoteJid, { text: reply });
-      } catch (error) {
-        console.error(`No se pudo responder a ${remoteJid}:`, error);
-      }
+    try {
+      console.log(`Respondiendo a ${incoming.from}`);
+      await client.sendMessage(incoming.from, reply);
+    } catch (error) {
+      console.error(`No se pudo responder a ${incoming.from}:`, error);
     }
   });
+
+  await client.initialize();
 }
 
 app.post('/webhook/message', (req, res) => {
@@ -654,8 +614,7 @@ app.get('/admin/debug', (_req, res) => {
       status: whatsappRuntime.status,
       authDir: whatsappRuntime.authDir,
       lastQrAt: whatsappRuntime.lastQrAt,
-      lastPairingCode: whatsappRuntime.lastPairingCode,
-      lastConnectionUpdate: whatsappRuntime.lastConnectionUpdate
+      lastClientEvent: whatsappRuntime.lastClientEvent
     }
   });
 });
