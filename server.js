@@ -5,11 +5,16 @@ const path = require('path');
 const app = express();
 app.use(express.json());
 
-const PORT = Number(process.env.PORT || 3000);
+const PORT = parsePort(process.env.PORT || '3000');
 const WHATSAPP_ENABLED = process.env.WHATSAPP_ENABLED === 'true';
 const WHATSAPP_AUTH_DIR = process.env.WHATSAPP_AUTH_DIR || path.join(__dirname, '.wwebjs_auth');
 const WHATSAPP_PRINT_QR = process.env.WHATSAPP_PRINT_QR !== 'false';
 const WHATSAPP_BROWSER_PATH = process.env.WHATSAPP_BROWSER_PATH || findBrowserExecutable();
+const DATA_FILE_PATH = process.env.DATA_FILE_PATH || path.join(__dirname, 'data', 'runtime-store.json');
+const LOG_MESSAGE_BODIES = process.env.LOG_MESSAGE_BODIES === 'true';
+const ADMIN_DEBUG_ENABLED = process.env.ADMIN_DEBUG_ENABLED !== 'false';
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
+const ADMIN_TOKEN_HEADER = 'x-admin-token';
 
 const STATES = {
   WELCOME: 'WELCOME',
@@ -26,9 +31,12 @@ const STATES = {
   FALLBACK: 'FALLBACK'
 };
 
-const sessions = new Map();
-const reiterations = [];
-const operatorQueue = [];
+validateRuntimeConfig();
+
+const runtimeStore = loadRuntimeStore(DATA_FILE_PATH);
+const sessions = new Map(runtimeStore.sessions.map((session) => [session.userId, session]));
+const reiterations = runtimeStore.reiterations;
+const operatorQueue = runtimeStore.operatorQueue;
 
 const whatsappRuntime = {
   enabled: WHATSAPP_ENABLED,
@@ -63,6 +71,7 @@ function updateSession(userId, patch) {
   };
 
   sessions.set(userId, updated);
+  persistRuntimeStore();
   return updated;
 }
 
@@ -76,6 +85,56 @@ function setState(userId, newState) {
 
 function normalizeInput(text = '') {
   return String(text).trim();
+}
+
+function parsePort(value) {
+  const port = Number(value);
+  if (!Number.isInteger(port) || port <= 0 || port > 65535) {
+    throw new Error(`PORT invalido: ${value}`);
+  }
+
+  return port;
+}
+
+function validateRuntimeConfig() {
+  if (ADMIN_DEBUG_ENABLED && !ADMIN_TOKEN) {
+    throw new Error('ADMIN_TOKEN es obligatorio cuando ADMIN_DEBUG_ENABLED no es false.');
+  }
+}
+
+function loadRuntimeStore(filePath) {
+  if (!fs.existsSync(filePath)) {
+    return {
+      sessions: [],
+      reiterations: [],
+      operatorQueue: []
+    };
+  }
+
+  try {
+    const raw = fs.readFileSync(filePath, 'utf8');
+    const parsed = JSON.parse(raw);
+    return {
+      sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
+      reiterations: Array.isArray(parsed.reiterations) ? parsed.reiterations : [],
+      operatorQueue: Array.isArray(parsed.operatorQueue) ? parsed.operatorQueue : []
+    };
+  } catch (error) {
+    throw new Error(`No se pudo cargar el archivo de datos ${filePath}: ${error.message}`);
+  }
+}
+
+function persistRuntimeStore() {
+  const directory = path.dirname(DATA_FILE_PATH);
+  fs.mkdirSync(directory, { recursive: true });
+
+  const payload = {
+    sessions: Array.from(sessions.values()),
+    reiterations,
+    operatorQueue
+  };
+
+  fs.writeFileSync(DATA_FILE_PATH, JSON.stringify(payload, null, 2), 'utf8');
 }
 
 function findBrowserExecutable() {
@@ -123,7 +182,7 @@ function fallbackMessage() {
   return [
     'No pude entender tu respuesta.',
     '',
-    'Escribi MENU para volver al menu principal.'
+    'Volve a intentar con una opcion valida o escribi MENU para volver al menu principal.'
   ].join('\n');
 }
 
@@ -267,20 +326,24 @@ function operatorContactMessage() {
   ].join('\n');
 }
 
+function retryMessage(nextStepMessage) {
+  return [fallbackMessage(), '', nextStepMessage].join('\n');
+}
+
 function shouldReturnToMenuOnNextMessage(state) {
   return [
     STATES.REITERATION_CONFIRMATION,
     STATES.REGISTER_HELP,
     STATES.CLAIM_TUTORIAL,
     STATES.SYSTEM_PROBLEM,
-    STATES.PHONE_SUPPORT,
-    STATES.FALLBACK
+    STATES.PHONE_SUPPORT
   ].includes(state);
 }
 
-function processMessage(userId, rawText) {
+function processMessage(userId, rawText, options = {}) {
   const text = normalizeInput(rawText);
   const session = getSession(userId);
+  const channel = options.channel || 'unknown';
 
   if (isMenuCommand(text)) {
     setState(userId, STATES.MAIN_MENU);
@@ -299,22 +362,22 @@ function processMessage(userId, rawText) {
 
   switch (session.state) {
     case STATES.MAIN_MENU:
-      return handleMainMenu(userId, text);
+      return handleMainMenu(userId, text, channel);
     case STATES.CLAIM_NEW:
       return handleClaimNew(userId, text);
     case STATES.CLAIM_REITERATION:
-      return handleClaimReiteration(userId, text);
+      return handleClaimReiteration(userId, text, channel);
     case STATES.MUNIDIGITAL_HELP:
       return handleMuniDigitalHelp(userId, text);
     case STATES.OPERATOR_CONTACT:
-      return handleOperatorContact(userId, text);
+      return handleOperatorContact(userId, text, channel);
     default:
       setState(userId, STATES.MAIN_MENU);
       return showMainMenu();
   }
 }
 
-function handleMainMenu(userId, text) {
+function handleMainMenu(userId, text, channel) {
   switch (text) {
     case '1':
       setState(userId, STATES.CLAIM_NEW);
@@ -332,13 +395,14 @@ function handleMainMenu(userId, text) {
       operatorQueue.push({
         userId,
         createdAt: new Date().toISOString(),
-        reason: 'operator_requested_from_main_menu'
+        reason: 'operator_requested_from_main_menu',
+        channel
       });
+      persistRuntimeStore();
       setState(userId, STATES.OPERATOR_CONTACT);
       return operatorContactMessage();
     default:
-      setState(userId, STATES.FALLBACK);
-      return fallbackMessage();
+      return retryMessage(showMainMenu());
   }
 }
 
@@ -351,15 +415,13 @@ function handleClaimNew(userId, text) {
       setState(userId, STATES.CLAIM_TUTORIAL);
       return claimTutorialMessage();
     default:
-      setState(userId, STATES.FALLBACK);
-      return fallbackMessage();
+      return retryMessage(claimNewMessage());
   }
 }
 
-function handleClaimReiteration(userId, text) {
+function handleClaimReiteration(userId, text, channel) {
   if (!isValidClaimNumber(text)) {
-    setState(userId, STATES.FALLBACK);
-    return fallbackMessage();
+    return retryMessage(reiterationMessage());
   }
 
   const normalizedClaimNumber = normalizeClaimNumber(text);
@@ -367,8 +429,9 @@ function handleClaimReiteration(userId, text) {
     userId,
     claimNumber: normalizedClaimNumber,
     createdAt: new Date().toISOString(),
-    channel: 'whatsapp'
+    channel
   });
+  persistRuntimeStore();
 
   updateSession(userId, {
     context: {
@@ -406,24 +469,50 @@ function handleMuniDigitalHelp(userId, text) {
       setState(userId, STATES.SYSTEM_PROBLEM);
       return systemProblemMessage();
     default:
-      setState(userId, STATES.FALLBACK);
-      return fallbackMessage();
+      return retryMessage(muniDigitalHelpMessage());
   }
 }
 
-function handleOperatorContact(userId, text) {
+function handleOperatorContact(userId, text, channel) {
   operatorQueue.push({
     userId,
     createdAt: new Date().toISOString(),
     reason: 'message_while_waiting_operator',
-    message: text
+    message: text,
+    channel
   });
+  persistRuntimeStore();
 
   return [
     'Tu mensaje fue registrado para el operador.',
     '',
     'Si necesitas volver al menu principal, escribi MENU.'
   ].join('\n');
+}
+
+function summarizeBodyForLogs(text) {
+  if (LOG_MESSAGE_BODIES) {
+    return `body="${text}"`;
+  }
+
+  return `bodyLength=${text.length}`;
+}
+
+function adminAuthMiddleware(req, res, next) {
+  if (!ADMIN_DEBUG_ENABLED) {
+    return res.status(404).json({ error: 'Ruta no disponible' });
+  }
+
+  const token = normalizeInput(req.header(ADMIN_TOKEN_HEADER));
+  if (!token) {
+    return res.status(401).json({ error: `Falta header ${ADMIN_TOKEN_HEADER}` });
+  }
+
+  if (token !== ADMIN_TOKEN) {
+    return res.status(403).json({ error: 'Token admin invalido' });
+  }
+
+  return next();
 }
 
 async function startWhatsAppBridge() {
@@ -531,7 +620,8 @@ async function startWhatsAppBridge() {
   });
 
   client.on('message', async (incoming) => {
-    console.log(`Mensaje entrante desde ${incoming.from}. fromMe=${incoming.fromMe} body="${normalizeInput(incoming.body)}"`);
+    const text = normalizeInput(incoming.body);
+    console.log(`Mensaje entrante desde ${incoming.from}. fromMe=${incoming.fromMe} ${summarizeBodyForLogs(text)}`);
 
     if (incoming.fromMe) {
       return;
@@ -542,13 +632,12 @@ async function startWhatsAppBridge() {
       return;
     }
 
-    const text = normalizeInput(incoming.body);
     if (!text) {
       console.log(`Mensaje sin texto util desde ${incoming.from}`);
       return;
     }
 
-    const reply = processMessage(incoming.from, text);
+    const reply = processMessage(incoming.from, text, { channel: 'whatsapp' });
     if (!reply) {
       console.log(`Sin respuesta generada para ${incoming.from}`);
       return;
@@ -574,7 +663,7 @@ app.post('/webhook/message', (req, res) => {
       return res.status(400).json({ error: 'userId es obligatorio' });
     }
 
-    const reply = processMessage(userId, message);
+    const reply = processMessage(userId, message, { channel: 'api' });
     const session = getSession(userId);
 
     return res.json({
@@ -590,26 +679,31 @@ app.post('/webhook/message', (req, res) => {
 });
 
 app.post('/webhook/start', (req, res) => {
-  const userId = normalizeInput(req.body.userId);
-  if (!userId) {
-    return res.status(400).json({ error: 'userId es obligatorio' });
+  try {
+    const userId = normalizeInput(req.body.userId);
+    if (!userId) {
+      return res.status(400).json({ error: 'userId es obligatorio' });
+    }
+
+    updateSession(userId, {
+      state: STATES.MAIN_MENU,
+      lastValidState: STATES.MAIN_MENU,
+      context: {}
+    });
+
+    return res.json({
+      ok: true,
+      userId,
+      state: STATES.MAIN_MENU,
+      reply: showMainMenu()
+    });
+  } catch (error) {
+    console.error('Error iniciando sesion:', error);
+    return res.status(500).json({ error: 'Error interno del servidor' });
   }
-
-  updateSession(userId, {
-    state: STATES.MAIN_MENU,
-    lastValidState: STATES.MAIN_MENU,
-    context: {}
-  });
-
-  return res.json({
-    ok: true,
-    userId,
-    state: STATES.MAIN_MENU,
-    reply: showMainMenu()
-  });
 });
 
-app.get('/admin/debug', (_req, res) => {
+app.get('/admin/debug', adminAuthMiddleware, (_req, res) => {
   res.json({
     sessions: Array.from(sessions.values()),
     reiterations,
@@ -624,8 +718,26 @@ app.get('/admin/debug', (_req, res) => {
   });
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Chatbot escuchando en http://localhost:${PORT}`);
+});
+
+server.on('error', (error) => {
+  console.error('No se pudo iniciar el servidor HTTP:', error);
+  process.exit(1);
+});
+
+process.on('SIGINT', async () => {
+  console.log('Cerrando servidor...');
+  try {
+    if (whatsappRuntime.client) {
+      await whatsappRuntime.client.destroy();
+    }
+  } catch (error) {
+    console.error('Error cerrando cliente de WhatsApp:', error);
+  } finally {
+    process.exit(0);
+  }
 });
 
 startWhatsAppBridge().catch((error) => {
