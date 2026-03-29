@@ -16,6 +16,7 @@ const ADMIN_TOKEN_HEADER = 'x-admin-token';
 const MATON_ENABLED = process.env.MATON_ENABLED === 'true';
 const MATON_API_KEY = process.env.MATON_API_KEY || '';
 const MATON_BASE_URL = process.env.MATON_BASE_URL || 'https://gateway.maton.ai';
+const MATON_CONNECTION_ID = process.env.MATON_CONNECTION_ID || '';
 const MATON_PHONE_NUMBER_ID = process.env.MATON_PHONE_NUMBER_ID || '';
 const MATON_WEBHOOK_VERIFY_TOKEN = process.env.MATON_WEBHOOK_VERIFY_TOKEN || '';
 const MATON_CHANNEL_NAME = 'maton_whatsapp';
@@ -47,6 +48,7 @@ const matonRuntime = {
   status: MATON_ENABLED ? 'configured' : 'disabled',
   baseUrl: MATON_BASE_URL,
   phoneNumberId: MATON_PHONE_NUMBER_ID || null,
+  connectionId: MATON_CONNECTION_ID || null,
   lastInboundAt: null,
   lastOutboundAt: null,
   lastEvent: null
@@ -571,7 +573,8 @@ async function sendMatonWhatsAppMessage(to, body) {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${MATON_API_KEY}`,
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      ...(MATON_CONNECTION_ID ? { 'Maton-Connection': MATON_CONNECTION_ID } : {})
     },
     body: JSON.stringify({
       messaging_product: 'whatsapp',
@@ -708,6 +711,7 @@ app.get('/admin/debug', adminAuthMiddleware, (_req, res) => {
       enabled: matonRuntime.enabled,
       status: matonRuntime.status,
       baseUrl: matonRuntime.baseUrl,
+      connectionId: matonRuntime.connectionId,
       phoneNumberId: matonRuntime.phoneNumberId,
       lastInboundAt: matonRuntime.lastInboundAt,
       lastOutboundAt: matonRuntime.lastOutboundAt,
