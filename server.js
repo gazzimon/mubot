@@ -2,19 +2,23 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
+
 const app = express();
 app.use(express.json());
 
 const PORT = parsePort(process.env.PORT || '3000');
-const WHATSAPP_ENABLED = process.env.WHATSAPP_ENABLED === 'true';
-const WHATSAPP_AUTH_DIR = process.env.WHATSAPP_AUTH_DIR || path.join(__dirname, '.wwebjs_auth');
-const WHATSAPP_PRINT_QR = process.env.WHATSAPP_PRINT_QR !== 'false';
-const WHATSAPP_BROWSER_PATH = process.env.WHATSAPP_BROWSER_PATH || findBrowserExecutable();
 const DATA_FILE_PATH = process.env.DATA_FILE_PATH || path.join(__dirname, 'data', 'runtime-store.json');
 const LOG_MESSAGE_BODIES = process.env.LOG_MESSAGE_BODIES === 'true';
 const ADMIN_DEBUG_ENABLED = process.env.ADMIN_DEBUG_ENABLED !== 'false';
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
 const ADMIN_TOKEN_HEADER = 'x-admin-token';
+
+const MATON_ENABLED = process.env.MATON_ENABLED === 'true';
+const MATON_API_KEY = process.env.MATON_API_KEY || '';
+const MATON_BASE_URL = process.env.MATON_BASE_URL || 'https://gateway.maton.ai';
+const MATON_PHONE_NUMBER_ID = process.env.MATON_PHONE_NUMBER_ID || '';
+const MATON_WEBHOOK_VERIFY_TOKEN = process.env.MATON_WEBHOOK_VERIFY_TOKEN || '';
+const MATON_CHANNEL_NAME = 'maton_whatsapp';
 
 const STATES = {
   WELCOME: 'WELCOME',
@@ -38,13 +42,14 @@ const sessions = new Map(runtimeStore.sessions.map((session) => [session.userId,
 const reiterations = runtimeStore.reiterations;
 const operatorQueue = runtimeStore.operatorQueue;
 
-const whatsappRuntime = {
-  enabled: WHATSAPP_ENABLED,
-  status: WHATSAPP_ENABLED ? 'booting' : 'disabled',
-  authDir: WHATSAPP_AUTH_DIR,
-  lastQrAt: null,
-  lastClientEvent: null,
-  client: null
+const matonRuntime = {
+  enabled: MATON_ENABLED,
+  status: MATON_ENABLED ? 'configured' : 'disabled',
+  baseUrl: MATON_BASE_URL,
+  phoneNumberId: MATON_PHONE_NUMBER_ID || null,
+  lastInboundAt: null,
+  lastOutboundAt: null,
+  lastEvent: null
 };
 
 function getSession(userId) {
@@ -57,6 +62,7 @@ function getSession(userId) {
       updatedAt: new Date().toISOString(),
       context: {}
     });
+    persistRuntimeStore();
   }
 
   return sessions.get(userId);
@@ -100,6 +106,20 @@ function validateRuntimeConfig() {
   if (ADMIN_DEBUG_ENABLED && !ADMIN_TOKEN) {
     throw new Error('ADMIN_TOKEN es obligatorio cuando ADMIN_DEBUG_ENABLED no es false.');
   }
+
+  if (MATON_ENABLED) {
+    if (!MATON_API_KEY) {
+      throw new Error('MATON_API_KEY es obligatorio cuando MATON_ENABLED=true.');
+    }
+
+    if (!MATON_PHONE_NUMBER_ID) {
+      throw new Error('MATON_PHONE_NUMBER_ID es obligatorio cuando MATON_ENABLED=true.');
+    }
+
+    if (!MATON_WEBHOOK_VERIFY_TOKEN) {
+      throw new Error('MATON_WEBHOOK_VERIFY_TOKEN es obligatorio cuando MATON_ENABLED=true.');
+    }
+  }
 }
 
 function loadRuntimeStore(filePath) {
@@ -135,23 +155,6 @@ function persistRuntimeStore() {
   };
 
   fs.writeFileSync(DATA_FILE_PATH, JSON.stringify(payload, null, 2), 'utf8');
-}
-
-function findBrowserExecutable() {
-  const candidates = [
-    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-    'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
-    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
-  ];
-
-  for (const candidate of candidates) {
-    if (fs.existsSync(candidate)) {
-      return candidate;
-    }
-  }
-
-  return '';
 }
 
 function isMenuCommand(text = '') {
@@ -515,143 +518,133 @@ function adminAuthMiddleware(req, res, next) {
   return next();
 }
 
-async function startWhatsAppBridge() {
-  if (!WHATSAPP_ENABLED) {
-    return;
+function verifyMatonWebhook(req, res) {
+  const mode = normalizeInput(req.query['hub.mode']);
+  const token = normalizeInput(req.query['hub.verify_token']);
+  const challenge = normalizeInput(req.query['hub.challenge']);
+
+  if (mode !== 'subscribe' || token !== MATON_WEBHOOK_VERIFY_TOKEN) {
+    return res.status(403).send('Forbidden');
   }
 
-  let Client;
-  let LocalAuth;
-  let qrcode;
+  matonRuntime.lastEvent = {
+    type: 'webhook_verification',
+    timestamp: new Date().toISOString()
+  };
+  return res.status(200).send(challenge);
+}
+
+function extractInboundMessages(payload) {
+  const messages = [];
+  const entries = Array.isArray(payload?.entry) ? payload.entry : [];
+
+  for (const entry of entries) {
+    const changes = Array.isArray(entry?.changes) ? entry.changes : [];
+    for (const change of changes) {
+      const value = change?.value;
+      const valueMessages = Array.isArray(value?.messages) ? value.messages : [];
+
+      for (const message of valueMessages) {
+        if (message?.type !== 'text' || !message?.text?.body || !message?.from) {
+          continue;
+        }
+
+        messages.push({
+          from: String(message.from),
+          text: normalizeInput(message.text.body),
+          raw: message
+        });
+      }
+    }
+  }
+
+  return messages;
+}
+
+async function sendMatonWhatsAppMessage(to, body) {
+  if (!MATON_ENABLED) {
+    throw new Error('MATON_ENABLED=false. No se puede enviar el mensaje.');
+  }
+
+  const endpoint = `${MATON_BASE_URL.replace(/\/$/, '')}/whatsapp-business/v21.0/${MATON_PHONE_NUMBER_ID}/messages`;
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${MATON_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      to,
+      type: 'text',
+      text: { body }
+    })
+  });
+
+  const responseText = await response.text();
+  let data;
 
   try {
-    ({ Client, LocalAuth } = require('whatsapp-web.js'));
+    data = responseText ? JSON.parse(responseText) : {};
+  } catch (_) {
+    data = { raw: responseText };
+  }
 
-    if (WHATSAPP_PRINT_QR) {
-      ({ default: qrcode } = await import('qrcode-terminal'));
+  if (!response.ok) {
+    throw new Error(`MATON envio fallo (${response.status}): ${responseText}`);
+  }
+
+  matonRuntime.status = 'connected';
+  matonRuntime.lastOutboundAt = new Date().toISOString();
+  matonRuntime.lastEvent = {
+    type: 'outbound_message',
+    timestamp: matonRuntime.lastOutboundAt,
+    to
+  };
+
+  return data;
+}
+
+async function handleMatonInboundWebhook(req, res) {
+  try {
+    const messages = extractInboundMessages(req.body);
+    matonRuntime.lastInboundAt = new Date().toISOString();
+    matonRuntime.lastEvent = {
+      type: 'inbound_webhook',
+      timestamp: matonRuntime.lastInboundAt,
+      messageCount: messages.length
+    };
+
+    if (!messages.length) {
+      return res.status(200).json({ ok: true, ignored: true });
     }
+
+    for (const incoming of messages) {
+      console.log(`Mensaje entrante MATON desde ${incoming.from} ${summarizeBodyForLogs(incoming.text)}`);
+
+      if (!incoming.text) {
+        continue;
+      }
+
+      const reply = processMessage(incoming.from, incoming.text, { channel: MATON_CHANNEL_NAME });
+      if (!reply) {
+        continue;
+      }
+
+      await sendMatonWhatsAppMessage(incoming.from, reply);
+    }
+
+    return res.status(200).json({ ok: true, processed: messages.length });
   } catch (error) {
-    whatsappRuntime.status = 'dependency_error';
-    console.error('No se pudo iniciar whatsapp-web.js. Instala sus dependencias primero.', error);
-    return;
+    matonRuntime.status = 'error';
+    matonRuntime.lastEvent = {
+      type: 'inbound_error',
+      timestamp: new Date().toISOString(),
+      message: error.message
+    };
+    console.error('Error procesando webhook de MATON:', error);
+    return res.status(500).json({ error: 'Error interno del servidor' });
   }
-
-  const client = new Client({
-    authStrategy: new LocalAuth({
-      dataPath: WHATSAPP_AUTH_DIR
-    }),
-    puppeteer: {
-      headless: true,
-      executablePath: WHATSAPP_BROWSER_PATH || undefined,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    }
-  });
-
-  whatsappRuntime.client = client;
-  whatsappRuntime.status = 'connecting';
-
-  if (WHATSAPP_BROWSER_PATH) {
-    console.log(`Usando navegador local: ${WHATSAPP_BROWSER_PATH}`);
-  } else {
-    console.log('No se encontro Chrome o Edge local. Puppeteer intentara usar su cache.');
-  }
-
-  client.on('qr', (qr) => {
-    whatsappRuntime.status = 'qr_pending';
-    whatsappRuntime.lastQrAt = new Date().toISOString();
-    whatsappRuntime.lastClientEvent = {
-      type: 'qr',
-      timestamp: whatsappRuntime.lastQrAt
-    };
-
-    console.log('QR recibido. Escanealo desde WhatsApp > Dispositivos vinculados.');
-    if (qrcode) {
-      qrcode.generate(qr, { small: true });
-    }
-  });
-
-  client.on('loading_screen', (percent, message) => {
-    whatsappRuntime.status = 'loading';
-    whatsappRuntime.lastClientEvent = {
-      type: 'loading_screen',
-      timestamp: new Date().toISOString(),
-      percent,
-      message
-    };
-    console.log(`WhatsApp cargando: ${percent}% ${message}`);
-  });
-
-  client.on('authenticated', () => {
-    whatsappRuntime.status = 'authenticated';
-    whatsappRuntime.lastClientEvent = {
-      type: 'authenticated',
-      timestamp: new Date().toISOString()
-    };
-    console.log('WhatsApp autenticado.');
-  });
-
-  client.on('ready', () => {
-    whatsappRuntime.status = 'connected';
-    whatsappRuntime.lastClientEvent = {
-      type: 'ready',
-      timestamp: new Date().toISOString()
-    };
-    console.log('WhatsApp conectado.');
-  });
-
-  client.on('auth_failure', (message) => {
-    whatsappRuntime.status = 'auth_failure';
-    whatsappRuntime.lastClientEvent = {
-      type: 'auth_failure',
-      timestamp: new Date().toISOString(),
-      message
-    };
-    console.error(`Fallo de autenticacion de WhatsApp: ${message}`);
-  });
-
-  client.on('disconnected', (reason) => {
-    whatsappRuntime.status = 'disconnected';
-    whatsappRuntime.lastClientEvent = {
-      type: 'disconnected',
-      timestamp: new Date().toISOString(),
-      reason: String(reason)
-    };
-    console.error(`WhatsApp desconectado: ${reason}`);
-  });
-
-  client.on('message', async (incoming) => {
-    const text = normalizeInput(incoming.body);
-    console.log(`Mensaje entrante desde ${incoming.from}. fromMe=${incoming.fromMe} ${summarizeBodyForLogs(text)}`);
-
-    if (incoming.fromMe) {
-      return;
-    }
-
-    if (incoming.from === 'status@broadcast' || incoming.from.endsWith('@g.us')) {
-      console.log(`Mensaje ignorado de ${incoming.from}`);
-      return;
-    }
-
-    if (!text) {
-      console.log(`Mensaje sin texto util desde ${incoming.from}`);
-      return;
-    }
-
-    const reply = processMessage(incoming.from, text, { channel: 'whatsapp' });
-    if (!reply) {
-      console.log(`Sin respuesta generada para ${incoming.from}`);
-      return;
-    }
-
-    try {
-      console.log(`Respondiendo a ${incoming.from}`);
-      await client.sendMessage(incoming.from, reply);
-    } catch (error) {
-      console.error(`No se pudo responder a ${incoming.from}:`, error);
-    }
-  });
-
-  await client.initialize();
 }
 
 app.post('/webhook/message', (req, res) => {
@@ -703,23 +696,33 @@ app.post('/webhook/start', (req, res) => {
   }
 });
 
+app.get('/webhook/maton/whatsapp', verifyMatonWebhook);
+app.post('/webhook/maton/whatsapp', handleMatonInboundWebhook);
+
 app.get('/admin/debug', adminAuthMiddleware, (_req, res) => {
   res.json({
     sessions: Array.from(sessions.values()),
     reiterations,
     operatorQueue,
-    whatsapp: {
-      enabled: whatsappRuntime.enabled,
-      status: whatsappRuntime.status,
-      authDir: whatsappRuntime.authDir,
-      lastQrAt: whatsappRuntime.lastQrAt,
-      lastClientEvent: whatsappRuntime.lastClientEvent
+    maton: {
+      enabled: matonRuntime.enabled,
+      status: matonRuntime.status,
+      baseUrl: matonRuntime.baseUrl,
+      phoneNumberId: matonRuntime.phoneNumberId,
+      lastInboundAt: matonRuntime.lastInboundAt,
+      lastOutboundAt: matonRuntime.lastOutboundAt,
+      lastEvent: matonRuntime.lastEvent
     }
   });
 });
 
 const server = app.listen(PORT, () => {
   console.log(`Chatbot escuchando en http://localhost:${PORT}`);
+  if (MATON_ENABLED) {
+    console.log(`Webhook MATON listo en http://localhost:${PORT}/webhook/maton/whatsapp`);
+  } else {
+    console.log('MATON esta deshabilitado. Solo quedan activos los webhooks de prueba HTTP.');
+  }
 });
 
 server.on('error', (error) => {
@@ -729,18 +732,5 @@ server.on('error', (error) => {
 
 process.on('SIGINT', async () => {
   console.log('Cerrando servidor...');
-  try {
-    if (whatsappRuntime.client) {
-      await whatsappRuntime.client.destroy();
-    }
-  } catch (error) {
-    console.error('Error cerrando cliente de WhatsApp:', error);
-  } finally {
-    process.exit(0);
-  }
-});
-
-startWhatsAppBridge().catch((error) => {
-  whatsappRuntime.status = 'boot_error';
-  console.error('No se pudo iniciar el puente de WhatsApp:', error);
+  process.exit(0);
 });
