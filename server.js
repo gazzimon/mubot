@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 const { createFlowHelpers } = require('./src/flows/alumbradoFlow');
+const { createMuniDigitalClient } = require('./src/services/munidigitalClient');
 const { storeIncomingImage } = require('./src/services/uploadStore');
 const app = express();
 app.use(express.json());
@@ -18,7 +19,12 @@ const LOG_MESSAGE_BODIES = process.env.LOG_MESSAGE_BODIES === 'true';
 const ADMIN_DEBUG_ENABLED = process.env.ADMIN_DEBUG_ENABLED !== 'false';
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
 const ADMIN_TOKEN_HEADER = 'x-admin-token';
+const ADMIN_TEST_ROUTES_ENABLED = process.env.ADMIN_TEST_ROUTES_ENABLED === 'true';
 const MUNIDIGITAL_ENV = normalizeEnvironment(process.env.MUNIDIGITAL_ENV || 'TEST');
+const MUNIDIGITAL_BASE_URL = process.env.MUNIDIGITAL_BASE_URL || defaultMuniDigitalBaseUrl(MUNIDIGITAL_ENV);
+const MUNIDIGITAL_ACCESS = process.env.MUNIDIGITAL_ACCESS || '';
+const MUNIDIGITAL_SECRET = process.env.MUNIDIGITAL_SECRET || '';
+const MUNIDIGITAL_TIMEOUT_MS = Number(process.env.MUNIDIGITAL_TIMEOUT_MS || '30000');
 
 const STATES = {
   WELCOME: 'WELCOME',
@@ -51,6 +57,13 @@ const whatsappRuntime = {
   client: null
 };
 
+const muniDigitalClient = createMuniDigitalClient({
+  baseUrl: MUNIDIGITAL_BASE_URL,
+  access: MUNIDIGITAL_ACCESS,
+  secret: MUNIDIGITAL_SECRET,
+  timeoutMs: MUNIDIGITAL_TIMEOUT_MS
+});
+
 const lightingFlow = createFlowHelpers({
   updateSession,
   setState,
@@ -66,6 +79,28 @@ const lightingFlow = createFlowHelpers({
       uploadsRoot: UPLOADS_DIR,
       userId: options.userId
     });
+  },
+  submitLightingClaim: async ({ payload, photo }) => {
+    const images = photo && photo.path ? [photo.path] : [];
+    try {
+      const response = await muniDigitalClient.submitIncident({
+        payload,
+        images
+      });
+      logMuniDigitalSubmissionResult({
+        payload,
+        hasPhoto: images.length > 0,
+        response
+      });
+      return response;
+    } catch (error) {
+      logMuniDigitalSubmissionResult({
+        payload,
+        hasPhoto: images.length > 0,
+        error
+      });
+      throw error;
+    }
   }
 });
 
@@ -113,6 +148,12 @@ function normalizeEnvironment(value = '') {
   return String(value).trim().toUpperCase() === 'PROD' ? 'PROD' : 'TEST';
 }
 
+function defaultMuniDigitalBaseUrl(environmentName) {
+  return environmentName === 'PROD'
+    ? 'https://munidigital.com/MuniDigitalCore'
+    : 'https://test.munidigital.net/MuniDigitalCore';
+}
+
 function extractPhoneFromUserId(userId = '') {
   const match = String(userId).match(/^(\d+)@/);
   return match ? match[1] : '';
@@ -126,6 +167,19 @@ function getPhoneCandidate(userId, options = {}) {
 
   const fromUserId = extractPhoneFromUserId(userId);
   return fromUserId || 'No disponible';
+}
+
+function isLoopbackRequest(req) {
+  const candidates = [
+    req.ip,
+    req.socket && req.socket.remoteAddress,
+    req.connection && req.connection.remoteAddress
+  ].filter(Boolean);
+
+  return candidates.some((value) => {
+    const normalized = String(value);
+    return normalized === '127.0.0.1' || normalized === '::1' || normalized === '::ffff:127.0.0.1';
+  });
 }
 
 function extractLocationFromIncoming(incoming) {
@@ -583,6 +637,111 @@ function adminAuthMiddleware(req, res, next) {
   return next();
 }
 
+function adminTestRouteMiddleware(req, res, next) {
+  if (!ADMIN_TEST_ROUTES_ENABLED) {
+    return res.status(404).json({ error: 'Ruta no disponible' });
+  }
+
+  if (!isLoopbackRequest(req)) {
+    return res.status(403).json({ error: 'Ruta permitida solo desde localhost' });
+  }
+
+  return adminAuthMiddleware(req, res, next);
+}
+
+function sanitizeMuniDigitalBody(body) {
+  if (body == null) {
+    return null;
+  }
+
+  if (typeof body === 'string') {
+    return body.length > 500 ? `${body.slice(0, 500)}...` : body;
+  }
+
+  if (Array.isArray(body)) {
+    return body.slice(0, 10);
+  }
+
+  return body;
+}
+
+function logMuniDigitalSubmissionResult(context) {
+  const payload = context && context.payload ? context.payload : {};
+  const safeSummary = {
+    direction: payload.direccion || '',
+    incidentTypeId: payload.tipoIncidenteId || null,
+    latitude: payload.latitud || '',
+    longitude: payload.longitud || '',
+    hasPhoto: Boolean(context && context.hasPhoto)
+  };
+
+  if (context && context.error) {
+    console.error('MuniDigital submit error', {
+      status: context.error.status || null,
+      message: context.error.message,
+      responseBody: sanitizeMuniDigitalBody(context.error.responseBody),
+      claim: safeSummary
+    });
+    return;
+  }
+
+  console.log('MuniDigital submit ok', {
+    status: context.response ? context.response.status : null,
+    body: sanitizeMuniDigitalBody(context.response ? context.response.body : null),
+    claim: safeSummary
+  });
+}
+
+function buildAdminLightingPayload(input = {}) {
+  const direccion = normalizeInput(input.direccion || input.address);
+  const observacionesBase = normalizeInput(input.observaciones || input.observations);
+  const telefono = normalizeInput(input.telefono || input.phone);
+  const latitud = input.latitud ?? input.latitude;
+  const longitud = input.longitud ?? input.longitude;
+  const tipoIncidenteId = Number(input.tipoIncidenteId);
+
+  if (!direccion) {
+    throw new Error('direccion es obligatoria');
+  }
+
+  if (!Number.isFinite(tipoIncidenteId)) {
+    throw new Error('tipoIncidenteId es obligatorio');
+  }
+
+  if (latitud === undefined || latitud === null || latitud === '') {
+    throw new Error('latitud es obligatoria');
+  }
+
+  if (longitud === undefined || longitud === null || longitud === '') {
+    throw new Error('longitud es obligatoria');
+  }
+
+  const observations = [
+    `Direccion informada: ${direccion}`,
+    telefono ? `Telefono de contacto: ${telefono}` : '',
+    observacionesBase || '',
+    'Reclamo generado desde endpoint admin de prueba.'
+  ].filter(Boolean).join(' ');
+
+  const areaServicioId = MUNIDIGITAL_ENV === 'PROD' ? 6878 : 7916;
+  const origenId = MUNIDIGITAL_ENV === 'PROD' ? null : 149;
+
+  return {
+    direccion,
+    areaServicioId,
+    tipoIncidenteId,
+    prioridadId: null,
+    identificadorId: null,
+    origenId,
+    localidad: 'Posadas',
+    latitud: String(latitud),
+    longitud: String(longitud),
+    observaciones: observations,
+    pais: 'Argentina',
+    barrio: ''
+  };
+}
+
 async function startWhatsAppBridge() {
   if (!WHATSAPP_ENABLED) {
     return;
@@ -794,6 +953,52 @@ app.get('/admin/debug', adminAuthMiddleware, (_req, res) => {
       lastClientEvent: whatsappRuntime.lastClientEvent
     }
   });
+});
+
+app.post('/admin/lighting/test-submit', adminTestRouteMiddleware, async (req, res) => {
+  try {
+    const payload = buildAdminLightingPayload(req.body || {});
+    const rawImagePaths = Array.isArray(req.body && req.body.imagePaths) ? req.body.imagePaths : [];
+    const imagePaths = rawImagePaths
+      .map((value) => normalizeInput(value))
+      .filter(Boolean)
+      .map((value) => path.resolve(__dirname, value));
+
+    const response = await muniDigitalClient.submitIncident({
+      payload,
+      images: imagePaths
+    });
+
+    logMuniDigitalSubmissionResult({
+      payload,
+      hasPhoto: imagePaths.length > 0,
+      response
+    });
+
+    return res.json({
+      ok: true,
+      payload,
+      imageCount: imagePaths.length,
+      response: {
+        status: response.status,
+        body: sanitizeMuniDigitalBody(response.body),
+        timestamp: response.timestamp
+      }
+    });
+  } catch (error) {
+    logMuniDigitalSubmissionResult({
+      payload: req.body || {},
+      hasPhoto: Array.isArray(req.body && req.body.imagePaths) && req.body.imagePaths.length > 0,
+      error
+    });
+
+    return res.status(error.status || 500).json({
+      ok: false,
+      error: error.message,
+      status: error.status || null,
+      responseBody: sanitizeMuniDigitalBody(error.responseBody)
+    });
+  }
 });
 
 const server = app.listen(PORT, () => {

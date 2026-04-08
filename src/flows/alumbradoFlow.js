@@ -20,7 +20,8 @@ function createFlowHelpers(dependencies) {
     getSession,
     getPhoneCandidate,
     catalogEnvironment,
-    saveImageFromIncoming
+    saveImageFromIncoming,
+    submitLightingClaim
   } = dependencies;
 
   const catalog = getLightingCatalog(catalogEnvironment);
@@ -115,12 +116,23 @@ function createFlowHelpers(dependencies) {
     ].join('\n');
   }
 
-  function successMessage() {
+  function successMessage(submission) {
+    const responseSummary = formatSubmissionSummary(submission);
     return [
-      'Tu reclamo quedo listo para ser enviado.',
+      'Tu reclamo fue enviado correctamente a MuniDigital.',
       '',
-      'En esta primera etapa lo estamos dejando preparado en el sistema para integrar con MuniDigital.',
+      responseSummary,
       'Si deseas iniciar otro reclamo, escribe MENU.'
+    ].join('\n');
+  }
+
+  function errorMessage() {
+    return [
+      'No pudimos enviar el reclamo a MuniDigital en este momento.',
+      '',
+      'Puedes responder 1 para reintentar el envio o 2 para cancelar.',
+      '',
+      'Escribi MENU para volver al menu principal.'
     ].join('\n');
   }
 
@@ -235,6 +247,31 @@ function createFlowHelpers(dependencies) {
       '',
       'Escribi MENU para volver al menu principal.'
     ].join('\n');
+  }
+
+  function formatSubmissionSummary(submission) {
+    const body = submission && submission.body;
+    if (!body) {
+      return 'La API respondio correctamente.';
+    }
+
+    if (typeof body === 'string') {
+      return `Respuesta API: ${body}`;
+    }
+
+    const candidates = [
+      body.numero,
+      body.id,
+      body.incidenteId,
+      body.reclamoId,
+      body.mensaje
+    ].filter(Boolean);
+
+    if (!candidates.length) {
+      return 'La API respondio correctamente.';
+    }
+
+    return `Respuesta API: ${candidates.join(' | ')}`;
   }
 
   async function handleLightingFlow(userId, text, options = {}) {
@@ -358,12 +395,40 @@ function createFlowHelpers(dependencies) {
 
       case FLOW_STATES.LIGHTING_CONFIRMATION:
         if (text === '1') {
+          const claim = getLightingContext(userId);
+          const payload = buildPayload(claim);
+
           updateLightingContext(userId, {
-            status: 'ready_for_munidigital',
-            completedAt: new Date().toISOString()
+            payloadPreview: payload,
+            status: 'sending_to_munidigital'
           });
-          setState(userId, FLOW_STATES.LIGHTING_SUBMITTED);
-          return successMessage();
+
+          try {
+            const submission = await submitLightingClaim({
+              payload,
+              photo: claim.photo,
+              claim
+            });
+
+            updateLightingContext(userId, {
+              status: 'submitted_to_munidigital',
+              completedAt: new Date().toISOString(),
+              submission
+            });
+            setState(userId, FLOW_STATES.LIGHTING_SUBMITTED);
+            return successMessage(submission);
+          } catch (error) {
+            updateLightingContext(userId, {
+              status: 'munidigital_error',
+              completedAt: new Date().toISOString(),
+              submissionError: {
+                message: error.message,
+                status: error.status || null,
+                responseBody: error.responseBody || null
+              }
+            });
+            return errorMessage();
+          }
         }
 
         if (text === '2') {
