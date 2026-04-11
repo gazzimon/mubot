@@ -8,6 +8,10 @@ function normalizeBaseUrl(value = '') {
   return String(value || '').replace(/\/+$/, '');
 }
 
+function buildTimestamp() {
+  return Math.floor(Date.now() / 1000).toString();
+}
+
 function buildAuthorizationHeader(access, secret, timestamp) {
   const message = `${timestamp}.${access}`;
   const hashHex = crypto
@@ -48,8 +52,8 @@ function parseResponseBody(text) {
 
 function createMuniDigitalClient(options = {}) {
   const baseUrl = normalizeBaseUrl(options.baseUrl);
-  const access = String(options.access || '').trim();
-  const secret = String(options.secret || '').trim();
+  const access = String(options.access || '');
+  const secret = String(options.secret || '');
   const timeoutMs = Number(options.timeoutMs) > 0 ? Number(options.timeoutMs) : DEFAULT_TIMEOUT_MS;
 
   function assertConfigured() {
@@ -69,7 +73,7 @@ function createMuniDigitalClient(options = {}) {
   async function submitIncident({ payload, images = [] }) {
     assertConfigured();
 
-    const timestamp = Date.now().toString();
+    const timestamp = buildTimestamp();
     const authorization = buildAuthorizationHeader(access, secret, timestamp);
     const form = new FormData();
     form.append('Incidente', JSON.stringify(payload));
@@ -118,5 +122,6 @@ function createMuniDigitalClient(options = {}) {
 
 module.exports = {
   createMuniDigitalClient,
-  buildAuthorizationHeader
+  buildAuthorizationHeader,
+  buildTimestamp
 };
