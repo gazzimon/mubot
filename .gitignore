@@ -3,5 +3,7 @@ node_modules
 .wwebjs_auth
 .wwebjs_cache
 data/runtime-store.json
+data/uploads/
 .env
-.env
+.data
+.gitignore
