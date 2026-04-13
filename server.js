@@ -284,10 +284,9 @@ function showMainMenu() {
     '',
     'Elegi una opcion:',
     '1. Hacer un reclamo',
-    '2. Reiterar un reclamo existente',
-    '3. Ayuda para usar MuniDigital',
-    '4. Atencion telefonica',
-    '5. Hablar con un operador',
+    '2. Ayuda para usar MuniDigital',
+    '3. Atencion telefonica',
+    '4. Hablar con un operador',
     '',
     'Escribi MENU para volver al menu principal en cualquier momento.'
   ].join('\n');
@@ -505,15 +504,12 @@ function handleMainMenu(userId, text, channel) {
       setState(userId, lightingFlow.FLOW_STATES.LIGHTING_INTRO);
       return lightingFlow.lightingIntroMessage();
     case '2':
-      setState(userId, STATES.CLAIM_REITERATION);
-      return reiterationMessage();
-    case '3':
       setState(userId, STATES.MUNIDIGITAL_HELP);
       return muniDigitalHelpMessage();
-    case '4':
+    case '3':
       setState(userId, STATES.PHONE_SUPPORT);
       return phoneSupportMessage();
-    case '5':
+    case '4':
       operatorQueue.push({
         userId,
         createdAt: new Date().toISOString(),

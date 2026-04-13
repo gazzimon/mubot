@@ -76,7 +76,7 @@ function createMuniDigitalClient(options = {}) {
     const timestamp = buildTimestamp();
     const authorization = buildAuthorizationHeader(access, secret, timestamp);
     const form = new FormData();
-    form.append('Incidente', JSON.stringify(payload));
+    form.append('incidente', JSON.stringify(payload));
 
     for (let index = 0; index < images.length; index += 1) {
       await appendImage(form, images[index], index);
