@@ -348,11 +348,19 @@ function createFlowHelpers(dependencies) {
       return `Respuesta API: ${body}`;
     }
 
-    const candidates = [
+    const claimNumber = [
+      body.result,
       body.numero,
       body.id,
       body.incidenteId,
-      body.reclamoId,
+      body.reclamoId
+    ].find((value) => value !== undefined && value !== null && String(value).trim() !== '');
+
+    if (claimNumber) {
+      return `Numero de reclamo: ${claimNumber}`;
+    }
+
+    const candidates = [
       body.mensaje
     ].filter(Boolean);
 
@@ -365,10 +373,11 @@ function createFlowHelpers(dependencies) {
 
   function successMessage(submission) {
     return [
-      'Tu reclamo fue enviado correctamente a MuniDigital.',
+      'Su reclamo fue registrado correctamente en la plataforma MuniDigital.',
       '',
       formatSubmissionSummary(submission),
-      'Si deseas iniciar otro reclamo, escribe MENU.'
+      'Por favor conserve este numero para el seguimiento de su tramite.',
+      'Si desea realizar otra gestion, escriba MENU.'
     ].join('\n');
   }
 
