@@ -25,6 +25,7 @@ function createFlowHelpers(dependencies) {
     getSession,
     catalogEnvironment,
     saveImageFromIncoming,
+    recordClaimTrackingEntry,
     submitLightingClaim
   } = dependencies;
 
@@ -750,6 +751,20 @@ function createFlowHelpers(dependencies) {
               claim: currentClaim
             });
 
+            try {
+              await recordClaimTrackingEntry({
+                createdAt: new Date().toISOString(),
+                userId,
+                channel: currentClaim.channel || '',
+                status: 'ok',
+                claim: currentClaim,
+                payload,
+                submission
+              });
+            } catch (trackingError) {
+              console.error('No se pudo registrar el seguimiento local del reclamo:', trackingError);
+            }
+
             updateLightingContext(userId, {
               status: 'submitted_to_munidigital',
               completedAt: new Date().toISOString(),
@@ -758,6 +773,24 @@ function createFlowHelpers(dependencies) {
             setState(userId, FLOW_STATES.LIGHTING_SUBMITTED);
             return successMessage(submission);
           } catch (error) {
+            try {
+              await recordClaimTrackingEntry({
+                createdAt: new Date().toISOString(),
+                userId,
+                channel: currentClaim.channel || '',
+                status: 'error',
+                claim: currentClaim,
+                payload,
+                error: {
+                  message: error.message,
+                  status: error.status || null,
+                  responseBody: error.responseBody || null
+                }
+              });
+            } catch (trackingError) {
+              console.error('No se pudo registrar el error en el seguimiento local del reclamo:', trackingError);
+            }
+
             updateLightingContext(userId, {
               status: 'munidigital_error',
               completedAt: new Date().toISOString(),

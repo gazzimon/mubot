@@ -4,6 +4,7 @@ const path = require('path');
 require('dotenv').config();
 const { createFlowHelpers } = require('./src/flows/alumbradoFlow');
 const { createMuniDigitalClient } = require('./src/services/munidigitalClient');
+const { createClaimTrackingWorkbook } = require('./src/services/claimTrackingWorkbook');
 const { storeIncomingImage } = require('./src/services/uploadStore');
 const app = express();
 app.use(express.json());
@@ -15,6 +16,7 @@ const WHATSAPP_PRINT_QR = process.env.WHATSAPP_PRINT_QR !== 'false';
 const WHATSAPP_BROWSER_PATH = process.env.WHATSAPP_BROWSER_PATH || findBrowserExecutable();
 const DATA_FILE_PATH = process.env.DATA_FILE_PATH || path.join(__dirname, 'data', 'runtime-store.json');
 const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(__dirname, 'data', 'uploads');
+const CLAIM_TRACKING_WORKBOOK_PATH = process.env.CLAIM_TRACKING_WORKBOOK_PATH || path.join(__dirname, 'data', 'reports', 'seguimiento-reclamos.xls');
 const REGISTER_HELP_IMAGE_PATH = process.env.REGISTER_HELP_IMAGE_PATH || path.join(__dirname, 'data', 'assets', 'muniregistro_liviano.jpg');
 const LOG_MESSAGE_BODIES = process.env.LOG_MESSAGE_BODIES === 'true';
 const ADMIN_DEBUG_ENABLED = process.env.ADMIN_DEBUG_ENABLED !== 'false';
@@ -63,6 +65,10 @@ const muniDigitalClient = createMuniDigitalClient({
   timeoutMs: MUNIDIGITAL_TIMEOUT_MS
 });
 
+const claimTrackingWorkbook = createClaimTrackingWorkbook({
+  workbookPath: CLAIM_TRACKING_WORKBOOK_PATH
+});
+
 const lightingFlow = createFlowHelpers({
   updateSession,
   setState,
@@ -78,6 +84,9 @@ const lightingFlow = createFlowHelpers({
       uploadsRoot: UPLOADS_DIR,
       userId: options.userId
     });
+  },
+  recordClaimTrackingEntry: async (entry) => {
+    await claimTrackingWorkbook.appendEntry(entry);
   },
   submitLightingClaim: async ({ payload, photo }) => {
     const images = photo && photo.path ? [photo.path] : [];
