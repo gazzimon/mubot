@@ -66,11 +66,16 @@ function createFlowHelpers(dependencies) {
     ].join('\n');
   }
 
+  function buildLocationLink(latitude, longitude) {
+    return `https://www.google.com/maps?q=${encodeURIComponent(`${latitude},${longitude}`)}`;
+  }
+
   function addressConfirmationMessage(candidate) {
+    const locationLink = buildLocationLink(candidate.latitude, candidate.longitude);
     return [
       'Encontre esta ubicacion en Posadas:',
       candidate.address,
-      `Coordenadas: ${candidate.latitude}, ${candidate.longitude}`,
+      `Ubicacion: ${locationLink}`,
       '',
       'Responde:',
       '1. Confirmar direccion',
@@ -374,6 +379,7 @@ function createFlowHelpers(dependencies) {
       ? serviceArea.incidentTypes.find((item) => item.id === claim.incidentTypeId)
       : null;
     const payload = buildPayload(claim);
+    const locationLink = buildLocationLink(payload.latitud, payload.longitud);
 
     updateLightingContext(userId, { payloadPreview: payload });
 
@@ -383,7 +389,7 @@ function createFlowHelpers(dependencies) {
       `Area: ${serviceArea ? serviceArea.label : 'No informada'}`,
       `Direccion: ${claim.address}`,
       `Barrio: ${claim.neighborhood}`,
-      `Coordenadas: ${payload.latitud}, ${payload.longitud}`,
+      `Ubicacion: ${locationLink}`,
       `Foto adjunta: ${claim.photo ? 'Si' : 'No'}`,
       `Tipo: ${incidentType ? incidentType.label : 'No informado'}`,
       `Observaciones: ${claim.observations}`,

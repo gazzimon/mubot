@@ -1,0 +1,21 @@
+services:
+  mubot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mubot
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      PORT: 3000
+      WHATSAPP_BROWSER_PATH: /usr/bin/chromium
+      WHATSAPP_AUTH_DIR: /app/.wwebjs_auth
+      DATA_FILE_PATH: /app/data/runtime-store.json
+      UPLOADS_DIR: /app/data/uploads
+    volumes:
+      - ./data:/app/data
+      - ./.wwebjs_auth:/app/.wwebjs_auth
+      - ./.wwebjs_cache:/app/.wwebjs_cache

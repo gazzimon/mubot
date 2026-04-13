@@ -1,0 +1,14 @@
+.git
+.gitignore
+node_modules
+npm-debug.log
+tmp-server-out.log
+tmp-server-err.log
+tmp_xlsx
+tmp_ids.zip
+.env
+.baileys_auth
+.wwebjs_auth
+.wwebjs_cache
+data/uploads
+data/runtime-store.json
