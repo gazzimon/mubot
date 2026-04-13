@@ -45,9 +45,14 @@ async function storeIncomingImage(message, options = {}) {
   const userDirectory = path.join(uploadsRoot, sanitizeFileSegment(options.userId, 'unknown-user'));
   ensureDirectoryExists(userDirectory);
 
-  const baseName = sanitizeFileSegment(media.filename || `photo-${Date.now()}`, `photo-${Date.now()}`);
-  const extension = path.extname(baseName) || fileExtensionForMimeType(media.mimetype);
-  const fileName = extension ? baseName : `${baseName}${extension || '.bin'}`;
+  const rawName = String(media.filename || `photo-${Date.now()}`);
+  const originalExtension = path.extname(rawName);
+  const baseName = sanitizeFileSegment(
+    originalExtension ? rawName.slice(0, -originalExtension.length) : rawName,
+    `photo-${Date.now()}`
+  );
+  const extension = originalExtension || fileExtensionForMimeType(media.mimetype) || '.bin';
+  const fileName = `${baseName}${extension}`;
   const filePath = path.join(userDirectory, fileName);
 
   fs.writeFileSync(filePath, Buffer.from(media.data, 'base64'));
