@@ -30,8 +30,6 @@ const STATES = {
   WELCOME: 'WELCOME',
   MAIN_MENU: 'MAIN_MENU',
   CLAIM_NEW: 'CLAIM_NEW',
-  CLAIM_REITERATION: 'CLAIM_REITERATION',
-  REITERATION_CONFIRMATION: 'REITERATION_CONFIRMATION',
   MUNIDIGITAL_HELP: 'MUNIDIGITAL_HELP',
   REGISTER_HELP: 'REGISTER_HELP',
   CLAIM_TUTORIAL: 'CLAIM_TUTORIAL',
@@ -273,30 +271,25 @@ function isMenuCommand(text = '') {
   return normalizeInput(text).toUpperCase() === 'MENU';
 }
 
-function isValidClaimNumber(text = '') {
-  const value = normalizeInput(text).toUpperCase();
-  return /^MU-?\d{3,20}$/.test(value) || /^\d{3,20}$/.test(value);
-}
-
 function showMainMenu() {
   return [
-    'Hola. Gracias por comunicarte con Movilidad Urbana Posadas.',
+    'Hola. Gracias por comunicarse con Movilidad Urbana Posadas.',
     '',
-    'Elegi una opcion:',
+    'Elija una opción:',
     '1. Hacer un reclamo',
     '2. Ayuda para usar MuniDigital',
-    '3. Atencion telefonica',
+    '3. Atención telefónica',
     '4. Hablar con un operador',
     '',
-    'Escribi MENU para volver al menu principal en cualquier momento.'
+    'Escriba MENU para volver al menu principal en cualquier momento.'
   ].join('\n');
 }
 
 function fallbackMessage() {
   return [
-    'No pude entender tu respuesta.',
+    'No pudimos interpretar su respuesta.',
     '',
-    'Volve a intentar con una opcion valida o escribi MENU para volver al menu principal.'
+    'Por favor, intente nuevamente con una opción válida o escriba MENU para volver al menu principal.'
   ].join('\n');
 }
 
@@ -306,137 +299,115 @@ function welcomeMessage() {
 
 function claimNewMessage() {
   return [
-    'Vamos a ayudarte a iniciar un reclamo.',
+    'Vamos a ayudarle a iniciar un reclamo.',
     '',
-    'Los reclamos se cargan en la plataforma MuniDigital, donde tambien podras consultar su estado.',
+    'Los reclamos se cargan en la plataforma MuniDigital, donde también podrá consultar su estado.',
     '',
-    'Elegi una opcion:',
+    'Elija una opción:',
     '1. No tengo usuario de MuniDigital',
-    '2. Tengo usuario, pero no se como cargar el reclamo',
+    '2. Tengo usuario, pero no sé cómo cargar el reclamo',
     '',
-    'Escribi MENU para volver al menu principal.'
-  ].join('\n');
-}
-
-function reiterationMessage() {
-  return [
-    'Si ya realizaste un reclamo en MuniDigital y el problema aun no fue resuelto, podes reiterarlo aqui.',
-    '',
-    'Por favor escribi el numero de reclamo.',
-    'Ejemplo: MU-12345',
-    '',
-    'Escribi MENU para volver al menu principal.'
-  ].join('\n');
-}
-
-function reiterationConfirmationMessage() {
-  return [
-    'Tu reiteracion fue registrada correctamente.',
-    '',
-    'La informacion sera enviada al area correspondiente.',
-    'Recorda que el seguimiento del reclamo se realiza desde la plataforma MuniDigital.',
-    '',
-    'Si necesitas realizar otra accion, escribi MENU para volver al menu principal.'
+    'Escriba MENU para volver al menu principal.'
   ].join('\n');
 }
 
 function muniDigitalHelpMessage() {
   return [
-    'Si necesitas ayuda para usar MuniDigital, elegi una opcion:',
+    'Si necesita ayuda para usar MuniDigital, elija una opción:',
     '',
     '1. No tengo usuario de MuniDigital',
-    '2. No se como cargar un reclamo',
+    '2. No sé cómo cargar un reclamo',
     '3. Tengo problemas con el sistema',
     '',
-    'Escribi MENU para volver al menu principal.'
+    'Escriba MENU para volver al menu principal.'
   ].join('\n');
 }
 
 function registerHelpMessage() {
   return [
-    'Para hacer un reclamo primero debes crear una cuenta en MuniDigital.',
+    'Para hacer un reclamo primero debe crear una cuenta en MuniDigital.',
     '',
-    'Podes registrarte aqui:',
+    'Puede registrarse aquí:',
     'https://munidigital.com/citizenv2/posadas/register',
     '',
-    'Durante el registro te solicitaran:',
+    'Durante el registro se le solicitará:',
     '- Nombre y apellido',
     '- DNI',
-    '- Telefono',
-    '- Correo electronico',
+    '- Teléfono',
+    '- Correo electrónico',
     '- Fecha de nacimiento',
-    '- Contrasena',
+    '- Contraseña',
     '',
-    'Escribi MENU para volver al menu principal.'
+    'Escriba MENU para volver al menu principal.'
   ].join('\n');
 }
 
 function claimTutorialMessage() {
   return [
-    'Para cargar un reclamo en MuniDigital segui estos pasos:',
+    'Para cargar un reclamo en MuniDigital siga estos pasos:',
     '',
-    '1. Ingresa a la plataforma',
-    '2. Inicia sesion con tu usuario',
-    '3. Selecciona Solicitudes / Reclamos',
-    '4. Elegi el area correspondiente',
-    '5. Completa los datos del problema',
-    '6. Podes adjuntar fotos si es necesario',
+    '1. Ingrese a la plataforma',
+    '2. Inicie sesión con su usuario',
+    '3. Seleccione Solicitudes / Reclamos',
+    '4. Elija el área correspondiente',
+    '5. Complete los datos del problema',
+    '6. Puede adjuntar fotos si es necesario',
     '',
-    'Accede aqui:',
+    'Acceda aquí:',
     'https://munidigital.com/citizenv2/posadas/login',
     '',
-    'Escribi MENU para volver al menu principal.'
+    'Escriba MENU para volver al menu principal.'
   ].join('\n');
 }
 
 function systemProblemMessage() {
   return [
-    'Si estas teniendo problemas con la plataforma MuniDigital, podes intentar lo siguiente:',
+    'Si presenta problemas con la plataforma MuniDigital, puede intentar lo siguiente:',
     '',
-    '- Verificar tu conexion a internet',
-    '- Intentar nuevamente mas tarde',
+    '- Verificar su conexión a internet',
+    '- Intentar nuevamente más tarde',
     '- Probar desde otro navegador o dispositivo',
     '',
-    'Si el problema continua, podes comunicarte con un operador desde este chat.',
+    'Si el problema continúa, puede comunicarse con un operador desde este chat.',
     '',
-    'Escribi MENU para volver al menu principal.'
+    'Escriba MENU para volver al menu principal.'
   ].join('\n');
 }
 
 function phoneSupportMessage() {
   return [
-    'Si preferis realizar tu consulta o reclamo por telefono, podes comunicarte con el 0800 de la Municipalidad de Posadas.',
+    'Si prefiere realizar su consulta o reclamo por teléfono, puede comunicarse con el 0800 de la Municipalidad de Posadas.',
     '',
     '0800-888-2483 (CIUDAD)',
     '',
-    'Horario de atencion:',
+    'Horario de atención:',
     'Lunes a viernes',
     '07:00 a 19:00 hs',
     '',
-    'A traves de este numero podes realizar:',
+    'A través de este número puede realizar:',
     '- consultas',
     '- reclamos',
     '- sugerencias',
     '',
-    'Para urgencias de transito (Guardia 24 hs):',
+    'Para urgencias de tránsito (Guardia 24 hs):',
     '3765-268999',
     '',
-    'Escribi MENU para volver al menu principal.'
+    'Escriba MENU para volver al menu principal.'
   ].join('\n');
 }
 
 function operatorContactMessage() {
   return [
-    'Tu consulta sera derivada a un operador de Movilidad Urbana.',
+    'Su consulta será derivada a un operador de Movilidad Urbana.',
     '',
-    'Un agente revisara tu mensaje y respondera por este mismo medio.',
+    'Un agente revisará su mensaje y responderá por este mismo medio.',
     'Debido a la cantidad de consultas, la respuesta puede demorar.',
     '',
-    'Recorda que:',
+    'Recuerde que:',
     '- Los reclamos se cargan en MuniDigital',
     '- El seguimiento del reclamo se realiza desde esa plataforma',
     '',
-    'Si necesitas volver al menu principal escribi MENU.'
+    'Si necesita volver al menu principal, escriba MENU.'
   ].join('\n');
 }
 
@@ -446,7 +417,6 @@ function retryMessage(nextStepMessage) {
 
 function shouldReturnToMenuOnNextMessage(state) {
   return [
-    STATES.REITERATION_CONFIRMATION,
     STATES.REGISTER_HELP,
     STATES.CLAIM_TUTORIAL,
     STATES.SYSTEM_PROBLEM,
@@ -486,8 +456,6 @@ async function processMessage(userId, rawText, options = {}) {
       return handleMainMenu(userId, text, channel);
     case STATES.CLAIM_NEW:
       return handleClaimNew(userId, text);
-    case STATES.CLAIM_REITERATION:
-      return handleClaimReiteration(userId, text, channel);
     case STATES.MUNIDIGITAL_HELP:
       return handleMuniDigitalHelp(userId, text);
     case STATES.OPERATOR_CONTACT:
@@ -537,44 +505,6 @@ function handleClaimNew(userId, text) {
   }
 }
 
-function handleClaimReiteration(userId, text, channel) {
-  if (!isValidClaimNumber(text)) {
-    return retryMessage(reiterationMessage());
-  }
-
-  const normalizedClaimNumber = normalizeClaimNumber(text);
-  reiterations.push({
-    userId,
-    claimNumber: normalizedClaimNumber,
-    createdAt: new Date().toISOString(),
-    channel
-  });
-  persistRuntimeStore();
-
-  updateSession(userId, {
-    context: {
-      ...getSession(userId).context,
-      lastClaimNumber: normalizedClaimNumber
-    }
-  });
-
-  setState(userId, STATES.REITERATION_CONFIRMATION);
-  return reiterationConfirmationMessage();
-}
-
-function normalizeClaimNumber(text) {
-  const value = normalizeInput(text).toUpperCase().replace(/\s+/g, '');
-  if (/^\d+$/.test(value)) {
-    return `MU-${value}`;
-  }
-
-  if (/^MU\d+$/.test(value)) {
-    return value.replace(/^MU/, 'MU-');
-  }
-
-  return value;
-}
-
 function handleMuniDigitalHelp(userId, text) {
   switch (text) {
     case '1':
@@ -602,9 +532,9 @@ function handleOperatorContact(userId, text, channel) {
   persistRuntimeStore();
 
   return [
-    'Tu mensaje fue registrado para el operador.',
+    'Su mensaje fue registrado para ser atendido por un operador.',
     '',
-    'Si necesitas volver al menu principal, escribi MENU.'
+    'Si desea volver al menu principal, escriba MENU.'
   ].join('\n');
 }
 

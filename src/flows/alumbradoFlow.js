@@ -32,37 +32,37 @@ function createFlowHelpers(dependencies) {
 
   function lightingIntroMessage() {
     return [
-      'Vamos a ayudarte a registrar un reclamo en MuniDigital.',
+      'Vamos a ayudarle a registrar un reclamo en MuniDigital.',
       '',
-      'Primero vamos a identificar el area correspondiente y luego te voy a pedir la ubicacion, una foto y los datos minimos para cargarlo.',
+      'Primero vamos a identificar el área correspondiente y luego se le solicitará la ubicación, una foto y los datos mínimos para cargarlo.',
       '',
-      'Indica el area del reclamo:',
+      'Indique el área del reclamo:',
       '1. Alumbrado',
-      '2. Semaforos',
+      '2. Semáforos',
       '',
-      'Escribi MENU para volver al menu principal.'
+      'Escriba MENU para volver al menu principal.'
     ].join('\n');
   }
 
   function addressOrLocationMessage() {
     return [
-      'Indicame la direccion exacta del incidente dentro de Posadas.',
-      'Si estas en el lugar, tambien podes compartir tu ubicacion.',
+      'Indique la dirección exacta del incidente dentro de Posadas.',
+      'Si se encuentra en el lugar, también puede compartir su ubicación.',
       '',
       'Ejemplo: Av. Corrientes 2030.',
       '',
-      'Escribi MENU para volver al menu principal.'
+      'Escriba MENU para volver al menu principal.'
     ].join('\n');
   }
 
   function addressDisambiguationMessage(options) {
     return [
-      'Encontre varias ubicaciones parecidas en Posadas.',
-      'Elige una opcion:',
+      'Se encontraron varias ubicaciones similares en Posadas.',
+      'Elija una opción:',
       ...options.map((item, index) => `${index + 1}. ${item.address}`),
       `${options.length + 1}. Ninguna de estas`,
       '',
-      'Escribi MENU para volver al menu principal.'
+      'Escriba MENU para volver al menu principal.'
     ].join('\n');
   }
 
@@ -73,133 +73,133 @@ function createFlowHelpers(dependencies) {
   function addressConfirmationMessage(candidate) {
     const locationLink = buildLocationLink(candidate.latitude, candidate.longitude);
     return [
-      'Encontre esta ubicacion en Posadas:',
+      'Encontré esta ubicación en Posadas:',
       candidate.address,
-      `Ubicacion: ${locationLink}`,
+      `Ubicación: ${locationLink}`,
       '',
-      'Responde:',
-      '1. Confirmar direccion',
-      '2. Corregir direccion',
+      'Responda:',
+      '1. Confirmar dirección',
+      '2. Corregir dirección',
       '',
-      'Escribi MENU para volver al menu principal.'
+      'Escriba MENU para volver al menu principal.'
     ].join('\n');
   }
 
   function neighborhoodMessage() {
     return [
-      'No pude identificar el barrio automaticamente.',
+      'No pudimos identificar el barrio automáticamente.',
       '',
-      'Indica el barrio del incidente.',
+      'Indique el barrio del incidente.',
       '',
       'Ejemplo: Centro',
       '',
-      'Escribi MENU para volver al menu principal.'
+      'Escriba MENU para volver al menu principal.'
     ].join('\n');
   }
 
   function photoRequestMessage() {
     return [
-      'Direccion confirmada.',
+      'Dirección confirmada.',
       '',
-      'Ahora enviame una foto del incidente.',
+      'Ahora envíe una foto del incidente.',
       '',
-      'Escribi MENU para volver al menu principal.'
+      'Escriba MENU para volver al menu principal.'
     ].join('\n');
   }
 
   function incidentTypeMessage(serviceArea) {
     return [
-      `Selecciona el tipo de incidente de ${serviceArea.label.toLowerCase()}:`,
+      `Seleccione el tipo de incidente de ${serviceArea.label.toLowerCase()}:`,
       '',
       ...serviceArea.incidentTypes.map((item) => `${item.menuOption}. ${item.label}`),
       '',
-      'Escribi MENU para volver al menu principal.'
+      'Escriba MENU para volver al menu principal.'
     ].join('\n');
   }
 
   function detailsMessage() {
     return [
-      'Describi brevemente el problema.',
+      'Describa brevemente el problema.',
       '',
-      'Ejemplo: Hace tres dias que esta apagada.',
+      'Ejemplo: Hace tres días que se encuentra apagada.',
       '',
-      'Escribi MENU para volver al menu principal.'
+      'Escriba MENU para volver al menu principal.'
     ].join('\n');
   }
 
   function phoneRequestMessage() {
     return [
-      'Indica tu numero de telefono con caracteristica.',
+      'Indique su número de teléfono con característica.',
       '',
       'Ejemplo: 3765123456',
       '',
-      'Escribi MENU para volver al menu principal.'
+      'Escriba MENU para volver al menu principal.'
     ].join('\n');
   }
 
   function dniRequestMessage() {
     return [
-      'Indica tu DNI.',
+      'Indique su DNI.',
       '',
       'Ejemplo: 37770375',
       '',
-      'Escribi MENU para volver al menu principal.'
+      'Escriba MENU para volver al menu principal.'
     ].join('\n');
   }
 
   function semaforosUnavailableMessage() {
     return [
-      'Semaforos aun no esta disponible en este flujo porque faltan sus codigos de MuniDigital.',
+      'Semáforos aún no está disponible en este flujo porque faltan sus códigos de MuniDigital.',
       '',
-      'Por ahora podes cargar un reclamo de alumbrado o escribir MENU para volver al menu principal.'
+      'Por el momento puede cargar un reclamo de alumbrado o escribir MENU para volver al menu principal.'
     ].join('\n');
   }
 
   function invalidPhotoMessage() {
     return [
-      'Necesito una foto valida del incidente para continuar.',
+      'Necesito una foto válida del incidente para continuar.',
       '',
-      'Por favor envia una imagen desde tu telefono.'
+      'Por favor envíe una imagen desde su teléfono.'
     ].join('\n');
   }
 
   function invalidAddressMessage() {
     return [
-      'No pude ubicar esa direccion dentro de Posadas.',
+      'No pudimos ubicar esa dirección dentro de Posadas.',
       '',
-      'Por favor escribe la direccion mas completa o comparte tu ubicacion actual.',
+      'Por favor escriba la dirección más completa o comparta su ubicación actual.',
       'Ejemplo: Av. Corrientes 2030, Centro.'
     ].join('\n');
   }
 
   function weakAddressMessage() {
     return [
-      'La direccion parece incompleta o poco precisa.',
+      'La dirección parece incompleta o poco precisa.',
       '',
-      'Agrega altura, barrio o una referencia, o comparte tu ubicacion actual.',
+      'Agregue altura, barrio o una referencia, o comparta su ubicación actual.',
       'Ejemplo: Av. Corrientes 2030, Centro.'
     ].join('\n');
   }
 
   function addressAttemptsExceededMessage() {
     return [
-      'Todavia no pude validar la direccion con precision dentro de Posadas.',
+      'Todavía no pudimos validar la dirección con precisión dentro de Posadas.',
       '',
-      'Para continuar, comparte tu ubicacion actual o escribe MENU para volver al menu principal.'
+      'Para continuar, comparta su ubicación actual o escriba MENU para volver al menu principal.'
     ].join('\n');
   }
 
   function invalidLocationMessage() {
     return [
-      'La ubicacion compartida no corresponde a Posadas o no pudo validarse.',
+      'La ubicación compartida no corresponde a Posadas o no pudo validarse.',
       '',
-      'Por favor envia una direccion dentro de Posadas o comparte otra ubicacion.'
+      'Por favor envíe una dirección dentro de Posadas o comparta otra ubicación.'
     ].join('\n');
   }
 
   function retryMessage(nextStepMessage) {
     return [
-      'No pude entender tu respuesta.',
+      'No pudimos interpretar su respuesta.',
       '',
       nextStepMessage
     ].join('\n');
@@ -209,9 +209,9 @@ function createFlowHelpers(dependencies) {
     return [
       'No pudimos enviar el reclamo a MuniDigital en este momento.',
       '',
-      'Puedes responder 1 para reintentar el envio o 2 para cancelar.',
+      'Puede responder 1 para reintentar el envío o 2 para cancelar.',
       '',
-      'Escribi MENU para volver al menu principal.'
+      'Escriba MENU para volver al menu principal.'
     ].join('\n');
   }
 
@@ -376,8 +376,8 @@ function createFlowHelpers(dependencies) {
       'Su reclamo fue registrado correctamente en la plataforma MuniDigital.',
       '',
       formatSubmissionSummary(submission),
-      'Por favor conserve este numero para el seguimiento de su tramite.',
-      'Si desea realizar otra gestion, escriba MENU.'
+      'Por favor conserve este número para el seguimiento de su trámite.',
+      'Si desea realizar otra gestión, escriba MENU.'
     ].join('\n');
   }
 
@@ -393,23 +393,23 @@ function createFlowHelpers(dependencies) {
     updateLightingContext(userId, { payloadPreview: payload });
 
     return [
-      'Revisa los datos del reclamo:',
+      'Revise los datos del reclamo:',
       '',
-      `Area: ${serviceArea ? serviceArea.label : 'No informada'}`,
-      `Direccion: ${claim.address}`,
+      `Área: ${serviceArea ? serviceArea.label : 'No informada'}`,
+      `Dirección: ${claim.address}`,
       `Barrio: ${claim.neighborhood}`,
-      `Ubicacion: ${locationLink}`,
-      `Foto adjunta: ${claim.photo ? 'Si' : 'No'}`,
+      `Ubicación: ${locationLink}`,
+      `Foto adjunta: ${claim.photo ? 'Sí' : 'No'}`,
       `Tipo: ${incidentType ? incidentType.label : 'No informado'}`,
       `Observaciones: ${claim.observations}`,
-      `Telefono: ${claim.phone}`,
+      `Teléfono: ${claim.phone}`,
       `DNI: ${claim.dni}`,
       '',
-      'Responde:',
+      'Responda:',
       '1. Confirmar',
       '2. Cancelar',
       '',
-      'Escribi MENU para volver al menu principal.'
+      'Escriba MENU para volver al menu principal.'
     ].join('\n');
   }
 
@@ -501,7 +501,7 @@ function createFlowHelpers(dependencies) {
       clearLightingContext(userId);
       setState(userId, FLOW_STATES.LIGHTING_INTRO);
       return [
-        'Reiniciamos el reclamo porque faltaba la ubicacion confirmada de una version previa del flujo.',
+        'Reiniciamos el reclamo porque faltaba la ubicación confirmada de una versión previa del flujo.',
         '',
         lightingIntroMessage()
       ].join('\n');
@@ -600,9 +600,9 @@ function createFlowHelpers(dependencies) {
           }
 
           return [
-            'No pude validar la direccion en este momento.',
+            'No pudimos validar la dirección en este momento.',
             '',
-            'Intenta nuevamente en unos instantes o comparte tu ubicacion actual.'
+            'Intente nuevamente en unos instantes o comparta su ubicación actual.'
           ].join('\n');
         }
       }
@@ -774,14 +774,14 @@ function createFlowHelpers(dependencies) {
         if (text === '2') {
           clearLightingContext(userId);
           setState(userId, 'MAIN_MENU');
-          return 'El reclamo fue cancelado. Escribe MENU para volver a empezar.';
+          return 'El reclamo fue cancelado. Escriba MENU para volver a comenzar.';
         }
 
         return retryMessage(summaryMessage(userId));
 
       case FLOW_STATES.LIGHTING_SUBMITTED:
         setState(userId, 'MAIN_MENU');
-        return 'Escribe MENU para iniciar una nueva gestion.';
+        return 'Escriba MENU para iniciar una nueva gestión.';
 
       default:
         return null;
