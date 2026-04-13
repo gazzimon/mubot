@@ -15,6 +15,7 @@ const WHATSAPP_PRINT_QR = process.env.WHATSAPP_PRINT_QR !== 'false';
 const WHATSAPP_BROWSER_PATH = process.env.WHATSAPP_BROWSER_PATH || findBrowserExecutable();
 const DATA_FILE_PATH = process.env.DATA_FILE_PATH || path.join(__dirname, 'data', 'runtime-store.json');
 const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(__dirname, 'data', 'uploads');
+const REGISTER_HELP_IMAGE_PATH = process.env.REGISTER_HELP_IMAGE_PATH || path.join(__dirname, 'data', 'assets', 'muniregistro_liviano.jpg');
 const LOG_MESSAGE_BODIES = process.env.LOG_MESSAGE_BODIES === 'true';
 const ADMIN_DEBUG_ENABLED = process.env.ADMIN_DEBUG_ENABLED !== 'false';
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
@@ -293,6 +294,49 @@ function fallbackMessage() {
   ].join('\n');
 }
 
+function buildReply(text, options = {}) {
+  return {
+    text,
+    mediaPath: options.mediaPath || '',
+    mediaType: options.mediaType || ''
+  };
+}
+
+function replyText(reply) {
+  if (!reply) {
+    return '';
+  }
+
+  return typeof reply === 'string' ? reply : normalizeInput(reply.text);
+}
+
+function replyMediaPath(reply) {
+  if (!reply || typeof reply === 'string') {
+    return '';
+  }
+
+  return normalizeInput(reply.mediaPath);
+}
+
+function replyMediaType(reply) {
+  if (!reply || typeof reply === 'string') {
+    return '';
+  }
+
+  return normalizeInput(reply.mediaType);
+}
+
+function buildRegisterHelpReply(text) {
+  if (fs.existsSync(REGISTER_HELP_IMAGE_PATH)) {
+    return buildReply(text, {
+      mediaPath: REGISTER_HELP_IMAGE_PATH,
+      mediaType: 'image'
+    });
+  }
+
+  return text;
+}
+
 function welcomeMessage() {
   return showMainMenu();
 }
@@ -324,7 +368,7 @@ function muniDigitalHelpMessage() {
 }
 
 function registerHelpMessage() {
-  return [
+  const text = [
     'Para hacer un reclamo primero debe crear una cuenta en MuniDigital.',
     '',
     'Puede registrarse aquí:',
@@ -340,6 +384,8 @@ function registerHelpMessage() {
     '',
     'Escriba MENU para volver al menu principal.'
   ].join('\n');
+
+  return buildRegisterHelpReply(text);
 }
 
 function claimTutorialMessage() {
@@ -675,10 +721,11 @@ async function startWhatsAppBridge() {
 
   let Client;
   let LocalAuth;
+  let MessageMedia;
   let qrcode;
 
   try {
-    ({ Client, LocalAuth } = require('whatsapp-web.js'));
+    ({ Client, LocalAuth, MessageMedia } = require('whatsapp-web.js'));
 
     if (WHATSAPP_PRINT_QR) {
       ({ default: qrcode } = await import('qrcode-terminal'));
@@ -797,14 +844,23 @@ async function startWhatsAppBridge() {
       location,
       phoneCandidate: extractPhoneFromUserId(incoming.from)
     });
-    if (!reply) {
+    const textReply = replyText(reply);
+    const mediaPath = replyMediaPath(reply);
+    if (!textReply && !mediaPath) {
       console.log(`Sin respuesta generada para ${incoming.from}`);
       return;
     }
 
     try {
       console.log(`Respondiendo a ${incoming.from}`);
-      await client.sendMessage(incoming.from, reply);
+      if (mediaPath && MessageMedia) {
+        const media = MessageMedia.fromFilePath(mediaPath);
+        await client.sendMessage(incoming.from, media, {
+          caption: textReply || undefined
+        });
+      } else {
+        await client.sendMessage(incoming.from, textReply);
+      }
     } catch (error) {
       console.error(`No se pudo responder a ${incoming.from}:`, error);
     }
@@ -833,7 +889,13 @@ app.post('/webhook/message', async (req, res) => {
       ok: true,
       userId,
       state: session.state,
-      reply
+      reply: replyText(reply),
+      attachment: replyMediaPath(reply)
+        ? {
+            type: replyMediaType(reply) || 'image',
+            fileName: path.basename(replyMediaPath(reply))
+          }
+        : null
     });
   } catch (error) {
     console.error('Error procesando mensaje:', error);

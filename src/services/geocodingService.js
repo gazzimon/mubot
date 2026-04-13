@@ -5,6 +5,12 @@ function normalizeString(value = '') {
   return String(value || '').trim();
 }
 
+function normalizeNeighborhoodLabel(value = '') {
+  return normalizeString(value)
+    .replace(/^(Centro de Integraci[oó]n Territorial|Delegaci[oó]n Municipal)\s+/i, '')
+    .trim();
+}
+
 function buildPosadasQuery(text) {
   const normalized = normalizeString(text);
   if (!normalized) {
@@ -36,7 +42,7 @@ function getAddressText(item = {}) {
   const address = item.address || {};
   const road = address.road || address.pedestrian || address.footway || address.cycleway || '';
   const houseNumber = address.house_number || '';
-  const suburb = address.suburb || address.neighbourhood || address.city_district || '';
+  const suburb = normalizeNeighborhoodLabel(address.suburb || address.neighbourhood || address.city_district || '');
   const city = address.city || address.town || address.village || '';
   const state = address.state || '';
   const country = address.country || '';
@@ -52,7 +58,7 @@ function normalizeCandidate(item = {}) {
     address: getAddressText(item),
     latitude: Number(item.lat),
     longitude: Number(item.lon),
-    barrio: normalizeString(address.suburb || address.neighbourhood || address.city_district || ''),
+    barrio: normalizeNeighborhoodLabel(address.suburb || address.neighbourhood || address.city_district || ''),
     localidad: normalizeString(address.city || address.town || address.village || ''),
     pais: normalizeString(address.country || '')
   };
