@@ -28,6 +28,7 @@ const MUNIDIGITAL_BASE_URL = process.env.MUNIDIGITAL_BASE_URL || defaultMuniDigi
 const MUNIDIGITAL_ACCESS = process.env.MUNIDIGITAL_ACCESS || '';
 const MUNIDIGITAL_SECRET = process.env.MUNIDIGITAL_SECRET || '';
 const MUNIDIGITAL_TIMEOUT_MS = Number(process.env.MUNIDIGITAL_TIMEOUT_MS || '30000');
+const OPERATOR_CONTACT_TIMEOUT_MINUTES = Number(process.env.OPERATOR_CONTACT_TIMEOUT_MINUTES || '15');
 
 const STATES = {
   WELCOME: 'WELCOME',
@@ -289,7 +290,7 @@ function showMainMenu() {
     '1. Hacer un reclamo',
     '2. Ayuda para usar MuniDigital',
     '3. Atención telefónica',
-    '4. Hablar con un operador',
+    '4. Chatear con un humano',
     '',
     'Escriba MENU para volver al menu principal en cualquier momento.'
   ].join('\n');
@@ -453,7 +454,7 @@ function phoneSupportMessage() {
 
 function operatorContactMessage() {
   return [
-    'Su consulta será derivada a un operador de Movilidad Urbana.',
+    'Su consulta será derivada a un humano de Movilidad Urbana.',
     '',
     'Un agente revisará su mensaje y responderá por este mismo medio.',
     'Debido a la cantidad de consultas, la respuesta puede demorar.',
@@ -479,6 +480,35 @@ function shouldReturnToMenuOnNextMessage(state) {
   ].includes(state);
 }
 
+function isOperatorContactExpired(session) {
+  if (session.state !== STATES.OPERATOR_CONTACT) {
+    return false;
+  }
+
+  if (!Number.isFinite(OPERATOR_CONTACT_TIMEOUT_MINUTES) || OPERATOR_CONTACT_TIMEOUT_MINUTES <= 0) {
+    return false;
+  }
+
+  const lastActivityAt = Date.parse(session.updatedAt || session.createdAt || '');
+  if (Number.isNaN(lastActivityAt)) {
+    return false;
+  }
+
+  const timeoutMs = OPERATOR_CONTACT_TIMEOUT_MINUTES * 60 * 1000;
+  return Date.now() - lastActivityAt >= timeoutMs;
+}
+
+function operatorContactExpiredMessage() {
+  return [
+    'La conversación para ser atendido por un humano finalizó por inactividad.',
+    '',
+    'Sabemos que esta espera puede resultar molesta.',
+    'Para que pueda seguir gestionando su consulta, volvimos a habilitar el chatbot.',
+    '',
+    'Elija una opción del menú o escriba MENU para volver a verlo.'
+  ].join('\n');
+}
+
 async function processMessage(userId, rawText, options = {}) {
   const text = normalizeInput(rawText);
   const session = getSession(userId);
@@ -492,6 +522,11 @@ async function processMessage(userId, rawText, options = {}) {
   if (session.state === STATES.WELCOME) {
     setState(userId, STATES.MAIN_MENU);
     return welcomeMessage();
+  }
+
+  if (isOperatorContactExpired(session)) {
+    setState(userId, STATES.MAIN_MENU);
+    return operatorContactExpiredMessage();
   }
 
   if (shouldReturnToMenuOnNextMessage(session.state)) {
