@@ -286,11 +286,10 @@ function showMainMenu() {
   return [
     'Hola. Gracias por comunicarse con Movilidad Urbana Posadas.',
     '',
-    'Elija una opción:',
+    '¿En qué podemos ayudarle?',
     '1. Hacer un reclamo',
-    '2. Ayuda para usar MuniDigital',
-    '3. Atención telefónica',
-    '4. Chatear con un humano',
+    '2. Ayuda con MuniDigital',
+    '3. Hablar con una oficial de atención al vecino',
     '',
     'Escriba MENU para volver al menu principal en cualquier momento.'
   ].join('\n');
