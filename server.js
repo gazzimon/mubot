@@ -6,6 +6,7 @@ const { createFlowHelpers } = require('./src/flows/alumbradoFlow');
 const { createMuniDigitalClient } = require('./src/services/munidigitalClient');
 const { createClaimTrackingWorkbook } = require('./src/services/claimTrackingWorkbook');
 const { storeIncomingImage } = require('./src/services/uploadStore');
+const { bold, italic, underline, joinFormattedText } = require('./src/utils/messageFormatting');
 const app = express();
 app.use(express.json());
 
@@ -286,20 +287,28 @@ function showMainMenu() {
   return [
     'Hola. Gracias por comunicarse con Movilidad Urbana Posadas.',
     '',
-    '¿En qué podemos ayudarle?',
+    bold('¿En qué podemos ayudarle?'),
     '1. Hacer un reclamo',
     '2. Ayuda con MuniDigital',
     '3. Hablar con una oficial de atención al vecino',
     '',
-    'Escriba MENU para volver al menu principal en cualquier momento.'
+    joinFormattedText([
+      'Escriba ',
+      underline('MENU'),
+      ' para volver al menu principal en cualquier momento.'
+    ])
   ].join('\n');
 }
 
 function fallbackMessage() {
   return [
-    'No pudimos interpretar su respuesta.',
+    bold('No pudimos interpretar su respuesta.'),
     '',
-    'Por favor, intente nuevamente con una opción válida o escriba MENU para volver al menu principal.'
+    joinFormattedText([
+      'Por favor, intente nuevamente con una opción válida o escriba ',
+      underline('MENU'),
+      ' para volver al menu principal.'
+    ])
   ].join('\n');
 }
 
@@ -356,23 +365,23 @@ function claimNewMessage() {
     '',
     'Los reclamos se cargan en la plataforma MuniDigital, donde también podrá consultar su estado.',
     '',
-    'Elija una opción:',
+    bold('Elija una opción:'),
     '1. No tengo usuario de MuniDigital',
-    '2. Tengo usuario, pero no sé cómo cargar el reclamo',
+    italic('2. Tengo usuario, pero no sé cómo cargar el reclamo'),
     '',
-    'Escriba MENU para volver al menu principal.'
+    `Escriba ${underline('MENU')} para volver al menu principal.`
   ].join('\n');
 }
 
 function muniDigitalHelpMessage() {
   return [
-    'Si necesita ayuda para usar MuniDigital, elija una opción:',
+    bold('Si necesita ayuda para usar MuniDigital, elija una opción:'),
     '',
     '1. No tengo usuario de MuniDigital',
     '2. No sé cómo cargar un reclamo',
     '3. Tengo problemas con el sistema',
     '',
-    'Escriba MENU para volver al menu principal.'
+    `Escriba ${underline('MENU')} para volver al menu principal.`
   ].join('\n');
 }
 
@@ -381,7 +390,7 @@ function registerHelpMessage() {
     'Para hacer un reclamo primero debe crear una cuenta en MuniDigital.',
     '',
     'Puede registrarse aquí:',
-    'https://munidigital.com/citizenv2/posadas/register',
+    underline('https://munidigital.com/citizenv2/posadas/register'),
     '',
     'Durante el registro se le solicitará:',
     '- Nombre y apellido',
@@ -391,7 +400,7 @@ function registerHelpMessage() {
     '- Fecha de nacimiento',
     '- Contraseña',
     '',
-    'Escriba MENU para volver al menu principal.'
+    `Escriba ${underline('MENU')} para volver al menu principal.`
   ].join('\n');
 
   return buildRegisterHelpReply(text);
@@ -456,13 +465,17 @@ function operatorContactMessage() {
     'Su consulta será derivada a un humano de Movilidad Urbana.',
     '',
     'Un agente revisará su mensaje y responderá por este mismo medio.',
-    'Debido a la cantidad de consultas, la respuesta puede demorar.',
+    italic('Debido a la cantidad de consultas, la respuesta puede demorar.'),
     '',
     'Recuerde que:',
     '- Los reclamos se cargan en MuniDigital',
     '- El seguimiento del reclamo se realiza desde esa plataforma',
     '',
-    'Si necesita volver al menu principal, escriba MENU.'
+    joinFormattedText([
+      'Si necesita volver al menu principal, escriba ',
+      underline('MENU'),
+      '.'
+    ])
   ].join('\n');
 }
 
@@ -504,7 +517,11 @@ function operatorContactExpiredMessage() {
     'Sabemos que esta espera puede resultar molesta.',
     'Para que pueda seguir gestionando su consulta, volvimos a habilitar el chatbot.',
     '',
-    'Elija una opción del menú o escriba MENU para volver a verlo.'
+    joinFormattedText([
+      'Elija una opción del menú o escriba ',
+      underline('MENU'),
+      ' para volver a verlo.'
+    ])
   ].join('\n');
 }
 

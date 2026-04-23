@@ -1,5 +1,6 @@
 const { getLightingCatalog } = require('./alumbradoCatalog');
 const { searchAddress, reverseGeocode } = require('../services/geocodingService');
+const { bold, italic, underline, joinFormattedText } = require('../utils/messageFormatting');
 
 const FLOW_STATES = {
   LIGHTING_INTRO: 'LIGHTING_INTRO',
@@ -33,7 +34,7 @@ function createFlowHelpers(dependencies) {
   const catalog = getLightingCatalog(catalogEnvironment);
 
   function formatProgressHeader(step, title) {
-    return [`Paso ${step}/${CLAIM_PROGRESS_TOTAL_STEPS} - ${title}`, ''].join('\n');
+    return [bold(`Paso ${step}/${CLAIM_PROGRESS_TOTAL_STEPS} - ${title}`), ''].join('\n');
   }
 
   function withProgress(message, step, title) {
@@ -52,7 +53,7 @@ function createFlowHelpers(dependencies) {
       '1. Alumbrado',
       '2. Semáforos',
       '',
-      'Escriba MENU para volver al menu principal.'
+      `Escriba ${underline('MENU')} para volver al menu principal.`
     ].join('\n'), 1, 'Area del reclamo');
   }
 
@@ -61,9 +62,9 @@ function createFlowHelpers(dependencies) {
       'Indique la dirección exacta del incidente dentro de Posadas.',
       'Si se encuentra en el lugar, también puede compartir su ubicación.',
       '',
-      'Ejemplo: Av. Corrientes 2030.',
+      italic('Ejemplo: Av. Corrientes 2030.'),
       '',
-      'Escriba MENU para volver al menu principal.'
+      `Escriba ${underline('MENU')} para volver al menu principal.`
     ].join('\n'), 2, 'Direccion del incidente');
   }
 
@@ -74,7 +75,7 @@ function createFlowHelpers(dependencies) {
       ...options.map((item, index) => `${index + 1}. ${item.address}`),
       `${options.length + 1}. Ninguna de estas`,
       '',
-      'Escriba MENU para volver al menu principal.'
+      `Escriba ${underline('MENU')} para volver al menu principal.`
     ].join('\n'), 2, 'Direccion del incidente');
   }
 
@@ -93,7 +94,7 @@ function createFlowHelpers(dependencies) {
       '1. Confirmar dirección',
       '2. Corregir dirección',
       '',
-      'Escriba MENU para volver al menu principal.'
+      `Escriba ${underline('MENU')} para volver al menu principal.`
     ].join('\n'), 3, 'Confirmacion de ubicacion');
   }
 
@@ -103,9 +104,9 @@ function createFlowHelpers(dependencies) {
       '',
       'Indique el barrio del incidente.',
       '',
-      'Ejemplo: Centro',
+      italic('Ejemplo: Centro'),
       '',
-      'Escriba MENU para volver al menu principal.'
+      `Escriba ${underline('MENU')} para volver al menu principal.`
     ].join('\n'), 3, 'Confirmacion de ubicacion');
   }
 
@@ -115,7 +116,7 @@ function createFlowHelpers(dependencies) {
       '',
       'Ahora envíe una foto del incidente.',
       '',
-      'Escriba MENU para volver al menu principal.'
+      `Escriba ${underline('MENU')} para volver al menu principal.`
     ].join('\n'), 4, 'Foto del incidente');
   }
 
@@ -125,7 +126,7 @@ function createFlowHelpers(dependencies) {
       '',
       ...serviceArea.incidentTypes.map((item) => `${item.menuOption}. ${item.label}`),
       '',
-      'Escriba MENU para volver al menu principal.'
+      `Escriba ${underline('MENU')} para volver al menu principal.`
     ].join('\n'), 5, 'Tipo de incidente');
   }
 
@@ -133,9 +134,9 @@ function createFlowHelpers(dependencies) {
     return withProgress([
       'Describa brevemente el problema.',
       '',
-      'Ejemplo: Hace tres días que se encuentra apagada.',
+      italic('Ejemplo: Hace tres días que se encuentra apagada.'),
       '',
-      'Escriba MENU para volver al menu principal.'
+      `Escriba ${underline('MENU')} para volver al menu principal.`
     ].join('\n'), 6, 'Descripcion del problema');
   }
 
@@ -143,9 +144,9 @@ function createFlowHelpers(dependencies) {
     return withProgress([
       'Indique su número de teléfono con característica.',
       '',
-      'Ejemplo: 3765123456',
+      italic('Ejemplo: 3765123456'),
       '',
-      'Escriba MENU para volver al menu principal.'
+      `Escriba ${underline('MENU')} para volver al menu principal.`
     ].join('\n'), 7, 'Telefono de contacto');
   }
 
@@ -153,9 +154,9 @@ function createFlowHelpers(dependencies) {
     return withProgress([
       'Indique su DNI.',
       '',
-      'Ejemplo: 37770375',
+      italic('Ejemplo: 37770375'),
       '',
-      'Escriba MENU para volver al menu principal.'
+      `Escriba ${underline('MENU')} para volver al menu principal.`
     ].join('\n'), 8, 'Documento');
   }
 
@@ -163,7 +164,11 @@ function createFlowHelpers(dependencies) {
     return [
       'Semáforos aún no está disponible en este flujo porque faltan sus códigos de MuniDigital.',
       '',
-      'Por el momento puede cargar un reclamo de alumbrado o escribir MENU para volver al menu principal.'
+      joinFormattedText([
+        'Por el momento puede cargar un reclamo de alumbrado o escribir ',
+        underline('MENU'),
+        ' para volver al menu principal.'
+      ])
     ].join('\n');
   }
 
@@ -180,7 +185,7 @@ function createFlowHelpers(dependencies) {
       'No pudimos ubicar esa dirección dentro de Posadas.',
       '',
       'Por favor escriba la dirección más completa o comparta su ubicación actual.',
-      'Ejemplo: Av. Corrientes 2030, Centro.'
+      italic('Ejemplo: Av. Corrientes 2030, Centro.')
     ].join('\n'), 2, 'Direccion del incidente');
   }
 
