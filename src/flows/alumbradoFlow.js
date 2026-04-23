@@ -17,6 +17,7 @@ const FLOW_STATES = {
 };
 
 const MAX_ADDRESS_ATTEMPTS = 3;
+const CLAIM_PROGRESS_TOTAL_STEPS = 8;
 
 function createFlowHelpers(dependencies) {
   const {
@@ -31,9 +32,19 @@ function createFlowHelpers(dependencies) {
 
   const catalog = getLightingCatalog(catalogEnvironment);
 
+  function formatProgressHeader(step, title) {
+    return [`Paso ${step}/${CLAIM_PROGRESS_TOTAL_STEPS} - ${title}`, ''].join('\n');
+  }
+
+  function withProgress(message, step, title) {
+    return [formatProgressHeader(step, title), message].join('\n');
+  }
+
   function lightingIntroMessage() {
-    return [
+    return withProgress([
       'Vamos a ayudarle a registrar un reclamo en MuniDigital.',
+      '',
+      `Este reclamo tiene ${CLAIM_PROGRESS_TOTAL_STEPS} pasos. Le iremos indicando el avance en cada uno.`,
       '',
       'Primero vamos a identificar el área correspondiente y luego se le solicitará la ubicación, una foto y los datos mínimos para cargarlo.',
       '',
@@ -42,29 +53,29 @@ function createFlowHelpers(dependencies) {
       '2. Semáforos',
       '',
       'Escriba MENU para volver al menu principal.'
-    ].join('\n');
+    ].join('\n'), 1, 'Area del reclamo');
   }
 
   function addressOrLocationMessage() {
-    return [
+    return withProgress([
       'Indique la dirección exacta del incidente dentro de Posadas.',
       'Si se encuentra en el lugar, también puede compartir su ubicación.',
       '',
       'Ejemplo: Av. Corrientes 2030.',
       '',
       'Escriba MENU para volver al menu principal.'
-    ].join('\n');
+    ].join('\n'), 2, 'Direccion del incidente');
   }
 
   function addressDisambiguationMessage(options) {
-    return [
+    return withProgress([
       'Se encontraron varias ubicaciones similares en Posadas.',
       'Elija una opción:',
       ...options.map((item, index) => `${index + 1}. ${item.address}`),
       `${options.length + 1}. Ninguna de estas`,
       '',
       'Escriba MENU para volver al menu principal.'
-    ].join('\n');
+    ].join('\n'), 2, 'Direccion del incidente');
   }
 
   function buildLocationLink(latitude, longitude) {
@@ -73,7 +84,7 @@ function createFlowHelpers(dependencies) {
 
   function addressConfirmationMessage(candidate) {
     const locationLink = buildLocationLink(candidate.latitude, candidate.longitude);
-    return [
+    return withProgress([
       'Encontré esta ubicación en Posadas:',
       candidate.address,
       `Ubicación: ${locationLink}`,
@@ -83,11 +94,11 @@ function createFlowHelpers(dependencies) {
       '2. Corregir dirección',
       '',
       'Escriba MENU para volver al menu principal.'
-    ].join('\n');
+    ].join('\n'), 3, 'Confirmacion de ubicacion');
   }
 
   function neighborhoodMessage() {
-    return [
+    return withProgress([
       'No pudimos identificar el barrio automáticamente.',
       '',
       'Indique el barrio del incidente.',
@@ -95,57 +106,57 @@ function createFlowHelpers(dependencies) {
       'Ejemplo: Centro',
       '',
       'Escriba MENU para volver al menu principal.'
-    ].join('\n');
+    ].join('\n'), 3, 'Confirmacion de ubicacion');
   }
 
   function photoRequestMessage() {
-    return [
+    return withProgress([
       'Dirección confirmada.',
       '',
       'Ahora envíe una foto del incidente.',
       '',
       'Escriba MENU para volver al menu principal.'
-    ].join('\n');
+    ].join('\n'), 4, 'Foto del incidente');
   }
 
   function incidentTypeMessage(serviceArea) {
-    return [
+    return withProgress([
       `Seleccione el tipo de incidente de ${serviceArea.label.toLowerCase()}:`,
       '',
       ...serviceArea.incidentTypes.map((item) => `${item.menuOption}. ${item.label}`),
       '',
       'Escriba MENU para volver al menu principal.'
-    ].join('\n');
+    ].join('\n'), 5, 'Tipo de incidente');
   }
 
   function detailsMessage() {
-    return [
+    return withProgress([
       'Describa brevemente el problema.',
       '',
       'Ejemplo: Hace tres días que se encuentra apagada.',
       '',
       'Escriba MENU para volver al menu principal.'
-    ].join('\n');
+    ].join('\n'), 6, 'Descripcion del problema');
   }
 
   function phoneRequestMessage() {
-    return [
+    return withProgress([
       'Indique su número de teléfono con característica.',
       '',
       'Ejemplo: 3765123456',
       '',
       'Escriba MENU para volver al menu principal.'
-    ].join('\n');
+    ].join('\n'), 7, 'Telefono de contacto');
   }
 
   function dniRequestMessage() {
-    return [
+    return withProgress([
       'Indique su DNI.',
       '',
       'Ejemplo: 37770375',
       '',
       'Escriba MENU para volver al menu principal.'
-    ].join('\n');
+    ].join('\n'), 8, 'Documento');
   }
 
   function semaforosUnavailableMessage() {
@@ -157,45 +168,45 @@ function createFlowHelpers(dependencies) {
   }
 
   function invalidPhotoMessage() {
-    return [
+    return withProgress([
       'Necesito una foto válida del incidente para continuar.',
       '',
       'Por favor envíe una imagen desde su teléfono.'
-    ].join('\n');
+    ].join('\n'), 4, 'Foto del incidente');
   }
 
   function invalidAddressMessage() {
-    return [
+    return withProgress([
       'No pudimos ubicar esa dirección dentro de Posadas.',
       '',
       'Por favor escriba la dirección más completa o comparta su ubicación actual.',
       'Ejemplo: Av. Corrientes 2030, Centro.'
-    ].join('\n');
+    ].join('\n'), 2, 'Direccion del incidente');
   }
 
   function weakAddressMessage() {
-    return [
+    return withProgress([
       'La dirección parece incompleta o poco precisa.',
       '',
       'Agregue altura, barrio o una referencia, o comparta su ubicación actual.',
       'Ejemplo: Av. Corrientes 2030, Centro.'
-    ].join('\n');
+    ].join('\n'), 2, 'Direccion del incidente');
   }
 
   function addressAttemptsExceededMessage() {
-    return [
+    return withProgress([
       'Todavía no pudimos validar la dirección con precisión dentro de Posadas.',
       '',
       'Para continuar, comparta su ubicación actual o escriba MENU para volver al menu principal.'
-    ].join('\n');
+    ].join('\n'), 2, 'Direccion del incidente');
   }
 
   function invalidLocationMessage() {
-    return [
+    return withProgress([
       'La ubicación compartida no corresponde a Posadas o no pudo validarse.',
       '',
       'Por favor envíe una dirección dentro de Posadas o comparta otra ubicación.'
-    ].join('\n');
+    ].join('\n'), 2, 'Direccion del incidente');
   }
 
   function retryMessage(nextStepMessage) {
@@ -394,6 +405,8 @@ function createFlowHelpers(dependencies) {
     updateLightingContext(userId, { payloadPreview: payload });
 
     return [
+      `Completo los ${CLAIM_PROGRESS_TOTAL_STEPS} pasos del reclamo.`,
+      '',
       'Revise los datos del reclamo:',
       '',
       `Área: ${serviceArea ? serviceArea.label : 'No informada'}`,
