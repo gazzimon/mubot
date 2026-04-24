@@ -361,13 +361,13 @@ function welcomeMessage() {
 
 function claimNewMessage() {
   return [
-    'Vamos a ayudarle a iniciar un reclamo.',
+    bold('Vamos a ayudarle a iniciar un reclamo.'),
     '',
-    'Los reclamos se cargan en la plataforma MuniDigital, donde también podrá consultar su estado.',
+    'El reclamo se cargará en la plataforma MuniDigital, donde también podrá consultar su estado.',
     '',
     bold('Elija una opción:'),
     '1. No tengo usuario de MuniDigital',
-    italic('2. Tengo usuario, pero no sé cómo cargar el reclamo'),
+    '2. Tengo usuario, pero no sé cómo cargar el reclamo',
     '',
     `Escriba ${underline('MENU')} para volver al menu principal.`
   ].join('\n');
@@ -375,8 +375,9 @@ function claimNewMessage() {
 
 function muniDigitalHelpMessage() {
   return [
-    bold('Si necesita ayuda para usar MuniDigital, elija una opción:'),
+    bold('Le ayudamos con MuniDigital.'),
     '',
+    'Elija una opción:',
     '1. No tengo usuario de MuniDigital',
     '2. No sé cómo cargar un reclamo',
     '3. Tengo problemas con el sistema',
@@ -387,12 +388,12 @@ function muniDigitalHelpMessage() {
 
 function registerHelpMessage() {
   const text = [
-    'Para hacer un reclamo primero debe crear una cuenta en MuniDigital.',
+    bold('Primero necesita crear una cuenta en MuniDigital.'),
     '',
     'Puede registrarse aquí:',
     underline('https://munidigital.com/citizenv2/posadas/register'),
     '',
-    'Durante el registro se le solicitará:',
+    bold('Durante el registro se le solicitará:'),
     '- Nombre y apellido',
     '- DNI',
     '- Teléfono',
@@ -408,7 +409,7 @@ function registerHelpMessage() {
 
 function claimTutorialMessage() {
   return [
-    'Para cargar un reclamo en MuniDigital siga estos pasos:',
+    bold('Para cargar un reclamo en MuniDigital, siga estos pasos:'),
     '',
     '1. Ingrese a la plataforma',
     '2. Inicie sesión con su usuario',
@@ -418,33 +419,33 @@ function claimTutorialMessage() {
     '6. Puede adjuntar fotos si es necesario',
     '',
     'Acceda aquí:',
-    'https://munidigital.com/citizenv2/posadas/login',
+    underline('https://munidigital.com/citizenv2/posadas/login'),
     '',
-    'Escriba MENU para volver al menu principal.'
+    `Escriba ${underline('MENU')} para volver al menu principal.`
   ].join('\n');
 }
 
 function systemProblemMessage() {
   return [
-    'Si presenta problemas con la plataforma MuniDigital, puede intentar lo siguiente:',
+    bold('Si tiene problemas con la plataforma MuniDigital, pruebe lo siguiente:'),
     '',
     '- Verificar su conexión a internet',
     '- Intentar nuevamente más tarde',
     '- Probar desde otro navegador o dispositivo',
     '',
-    'Si el problema continúa, puede comunicarse con un operador desde este chat.',
+    'Si el problema continúa, puede comunicarse con una oficial de atención desde este chat.',
     '',
-    'Escriba MENU para volver al menu principal.'
+    `Escriba ${underline('MENU')} para volver al menu principal.`
   ].join('\n');
 }
 
 function phoneSupportMessage() {
   return [
-    'Si prefiere realizar su consulta o reclamo por teléfono, puede comunicarse con el 0800 de la Municipalidad de Posadas.',
+    bold('Si prefiere atención telefónica, puede comunicarse con la Municipalidad de Posadas.'),
     '',
     '0800-888-2483 (CIUDAD)',
     '',
-    'Horario de atención:',
+    bold('Horario de atención:'),
     'Lunes a viernes',
     '07:00 a 19:00 hs',
     '',
@@ -453,21 +454,21 @@ function phoneSupportMessage() {
     '- reclamos',
     '- sugerencias',
     '',
-    'Para urgencias de tránsito (Guardia 24 hs):',
+    bold('Para urgencias de tránsito (Guardia 24 hs):'),
     '3765-268999',
     '',
-    'Escriba MENU para volver al menu principal.'
+    `Escriba ${underline('MENU')} para volver al menu principal.`
   ].join('\n');
 }
 
 function operatorContactMessage() {
   return [
-    'Su consulta será derivada a un humano de Movilidad Urbana.',
+    bold('Su consulta será derivada a una oficial de atención al vecino.'),
     '',
-    'Un agente revisará su mensaje y responderá por este mismo medio.',
+    'Una agente revisará su mensaje y responderá por este mismo medio.',
     italic('Debido a la cantidad de consultas, la respuesta puede demorar.'),
     '',
-    'Recuerde que:',
+    bold('Recuerde que:'),
     '- Los reclamos se cargan en MuniDigital',
     '- El seguimiento del reclamo se realiza desde esa plataforma',
     '',
@@ -512,7 +513,7 @@ function isOperatorContactExpired(session) {
 
 function operatorContactExpiredMessage() {
   return [
-    'La conversación para ser atendido por un humano finalizó por inactividad.',
+    bold('La conversación con la oficial de atención finalizó por inactividad.'),
     '',
     'Sabemos que esta espera puede resultar molesta.',
     'Para que pueda seguir gestionando su consulta, volvimos a habilitar el chatbot.',

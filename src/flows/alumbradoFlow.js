@@ -43,13 +43,13 @@ function createFlowHelpers(dependencies) {
 
   function lightingIntroMessage() {
     return withProgress([
-      'Vamos a ayudarle a registrar un reclamo en MuniDigital.',
+      bold('Vamos a ayudarle a registrar un reclamo en MuniDigital.'),
       '',
       `Este reclamo tiene ${CLAIM_PROGRESS_TOTAL_STEPS} pasos. Le iremos indicando el avance en cada uno.`,
       '',
-      'Primero vamos a identificar el área correspondiente y luego se le solicitará la ubicación, una foto y los datos mínimos para cargarlo.',
+      'Primero identificaremos el área correspondiente. Luego le pediremos la ubicación, una foto y los datos mínimos para cargarlo.',
       '',
-      'Indique el área del reclamo:',
+      bold('Indique el área del reclamo:'),
       '1. Alumbrado',
       '2. Semáforos',
       '',
@@ -60,7 +60,7 @@ function createFlowHelpers(dependencies) {
   function addressOrLocationMessage() {
     return withProgress([
       'Indique la dirección exacta del incidente dentro de Posadas.',
-      'Si se encuentra en el lugar, también puede compartir su ubicación.',
+      'Si está en el lugar, también puede compartir su ubicación.',
       '',
       italic('Ejemplo: Av. Corrientes 2030.'),
       '',
@@ -70,7 +70,7 @@ function createFlowHelpers(dependencies) {
 
   function addressDisambiguationMessage(options) {
     return withProgress([
-      'Se encontraron varias ubicaciones similares en Posadas.',
+      bold('Encontramos varias ubicaciones similares en Posadas.'),
       'Elija una opción:',
       ...options.map((item, index) => `${index + 1}. ${item.address}`),
       `${options.length + 1}. Ninguna de estas`,
@@ -86,7 +86,7 @@ function createFlowHelpers(dependencies) {
   function addressConfirmationMessage(candidate) {
     const locationLink = buildLocationLink(candidate.latitude, candidate.longitude);
     return withProgress([
-      'Encontré esta ubicación en Posadas:',
+      bold('Encontré esta ubicación en Posadas:'),
       candidate.address,
       `Ubicación: ${locationLink}`,
       '',
@@ -100,7 +100,7 @@ function createFlowHelpers(dependencies) {
 
   function neighborhoodMessage() {
     return withProgress([
-      'No pudimos identificar el barrio automáticamente.',
+      bold('No pudimos identificar el barrio automáticamente.'),
       '',
       'Indique el barrio del incidente.',
       '',
@@ -112,7 +112,7 @@ function createFlowHelpers(dependencies) {
 
   function photoRequestMessage() {
     return withProgress([
-      'Dirección confirmada.',
+      bold('Dirección confirmada.'),
       '',
       'Ahora envíe una foto del incidente.',
       '',
@@ -122,7 +122,7 @@ function createFlowHelpers(dependencies) {
 
   function incidentTypeMessage(serviceArea) {
     return withProgress([
-      `Seleccione el tipo de incidente de ${serviceArea.label.toLowerCase()}:`,
+      bold(`Seleccione el tipo de incidente de ${serviceArea.label.toLowerCase()}:`),
       '',
       ...serviceArea.incidentTypes.map((item) => `${item.menuOption}. ${item.label}`),
       '',
@@ -134,7 +134,7 @@ function createFlowHelpers(dependencies) {
     return withProgress([
       'Describa brevemente el problema.',
       '',
-      italic('Ejemplo: Hace tres días que se encuentra apagada.'),
+      italic('Ejemplo: Hace tres días que está apagada.'),
       '',
       `Escriba ${underline('MENU')} para volver al menu principal.`
     ].join('\n'), 6, 'Descripcion del problema');
@@ -162,7 +162,9 @@ function createFlowHelpers(dependencies) {
 
   function semaforosUnavailableMessage() {
     return [
-      'Semáforos aún no está disponible en este flujo porque faltan sus códigos de MuniDigital.',
+      bold('La opción de semáforos aún no está disponible en este flujo.'),
+      '',
+      'Todavía faltan sus códigos de MuniDigital.',
       '',
       joinFormattedText([
         'Por el momento puede cargar un reclamo de alumbrado o escribir ',
@@ -174,7 +176,7 @@ function createFlowHelpers(dependencies) {
 
   function invalidPhotoMessage() {
     return withProgress([
-      'Necesito una foto válida del incidente para continuar.',
+      bold('Necesito una foto válida del incidente para continuar.'),
       '',
       'Por favor envíe una imagen desde su teléfono.'
     ].join('\n'), 4, 'Foto del incidente');
@@ -182,7 +184,7 @@ function createFlowHelpers(dependencies) {
 
   function invalidAddressMessage() {
     return withProgress([
-      'No pudimos ubicar esa dirección dentro de Posadas.',
+      bold('No pudimos ubicar esa dirección dentro de Posadas.'),
       '',
       'Por favor escriba la dirección más completa o comparta su ubicación actual.',
       italic('Ejemplo: Av. Corrientes 2030, Centro.')
@@ -191,24 +193,28 @@ function createFlowHelpers(dependencies) {
 
   function weakAddressMessage() {
     return withProgress([
-      'La dirección parece incompleta o poco precisa.',
+      bold('La dirección parece incompleta o poco precisa.'),
       '',
       'Agregue altura, barrio o una referencia, o comparta su ubicación actual.',
-      'Ejemplo: Av. Corrientes 2030, Centro.'
+      italic('Ejemplo: Av. Corrientes 2030, Centro.')
     ].join('\n'), 2, 'Direccion del incidente');
   }
 
   function addressAttemptsExceededMessage() {
     return withProgress([
-      'Todavía no pudimos validar la dirección con precisión dentro de Posadas.',
+      bold('Todavía no pudimos validar la dirección con precisión dentro de Posadas.'),
       '',
-      'Para continuar, comparta su ubicación actual o escriba MENU para volver al menu principal.'
+      joinFormattedText([
+        'Para continuar, comparta su ubicación actual o escriba ',
+        underline('MENU'),
+        ' para volver al menu principal.'
+      ])
     ].join('\n'), 2, 'Direccion del incidente');
   }
 
   function invalidLocationMessage() {
     return withProgress([
-      'La ubicación compartida no corresponde a Posadas o no pudo validarse.',
+      bold('La ubicación compartida no corresponde a Posadas o no pudo validarse.'),
       '',
       'Por favor envíe una dirección dentro de Posadas o comparta otra ubicación.'
     ].join('\n'), 2, 'Direccion del incidente');
@@ -216,7 +222,7 @@ function createFlowHelpers(dependencies) {
 
   function retryMessage(nextStepMessage) {
     return [
-      'No pudimos interpretar su respuesta.',
+      bold('No pudimos interpretar su respuesta.'),
       '',
       nextStepMessage
     ].join('\n');
@@ -224,11 +230,11 @@ function createFlowHelpers(dependencies) {
 
   function errorMessage() {
     return [
-      'No pudimos enviar el reclamo a MuniDigital en este momento.',
+      bold('No pudimos enviar el reclamo a MuniDigital en este momento.'),
       '',
-      'Puede responder 1 para reintentar el envío o 2 para cancelar.',
+      'Responda 1 para reintentar el envío o 2 para cancelar.',
       '',
-      'Escriba MENU para volver al menu principal.'
+      `Escriba ${underline('MENU')} para volver al menu principal.`
     ].join('\n');
   }
 
@@ -390,11 +396,11 @@ function createFlowHelpers(dependencies) {
 
   function successMessage(submission) {
     return [
-      'Su reclamo fue registrado correctamente en la plataforma MuniDigital.',
+      bold('Su reclamo fue registrado correctamente en la plataforma MuniDigital.'),
       '',
       formatSubmissionSummary(submission),
-      'Por favor conserve este número para el seguimiento de su trámite.',
-      'Si desea realizar otra gestión, escriba MENU.'
+      'Por favor conserve este número para seguir el trámite.',
+      `Si desea realizar otra gestión, escriba ${underline('MENU')}.`
     ].join('\n');
   }
 
@@ -410,9 +416,9 @@ function createFlowHelpers(dependencies) {
     updateLightingContext(userId, { payloadPreview: payload });
 
     return [
-      `Completo los ${CLAIM_PROGRESS_TOTAL_STEPS} pasos del reclamo.`,
+      bold(`Completó los ${CLAIM_PROGRESS_TOTAL_STEPS} pasos del reclamo.`),
       '',
-      'Revise los datos del reclamo:',
+      bold('Revise los datos del reclamo:'),
       '',
       `Área: ${serviceArea ? serviceArea.label : 'No informada'}`,
       `Dirección: ${claim.address}`,
@@ -428,7 +434,7 @@ function createFlowHelpers(dependencies) {
       '1. Confirmar',
       '2. Cancelar',
       '',
-      'Escriba MENU para volver al menu principal.'
+      `Escriba ${underline('MENU')} para volver al menu principal.`
     ].join('\n');
   }
 
@@ -825,14 +831,14 @@ function createFlowHelpers(dependencies) {
         if (text === '2') {
           clearLightingContext(userId);
           setState(userId, 'MAIN_MENU');
-          return 'El reclamo fue cancelado. Escriba MENU para volver a comenzar.';
+          return `El reclamo fue cancelado. Escriba ${underline('MENU')} para volver a comenzar.`;
         }
 
         return retryMessage(summaryMessage(userId));
 
       case FLOW_STATES.LIGHTING_SUBMITTED:
         setState(userId, 'MAIN_MENU');
-        return 'Escriba MENU para iniciar una nueva gestión.';
+        return `Escriba ${underline('MENU')} para iniciar una nueva gestión.`;
 
       default:
         return null;
