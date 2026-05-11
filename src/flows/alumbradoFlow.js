@@ -362,6 +362,11 @@ function createFlowHelpers(dependencies) {
   }
 
   function formatSubmissionSummary(submission) {
+    const claimNumber = extractSubmissionClaimNumber(submission);
+    if (claimNumber) {
+      return `Numero de reclamo: ${claimNumber}`;
+    }
+
     const body = submission && submission.body;
     if (!body) {
       return 'La API respondio correctamente.';
@@ -369,18 +374,6 @@ function createFlowHelpers(dependencies) {
 
     if (typeof body === 'string') {
       return `Respuesta API: ${body}`;
-    }
-
-    const claimNumber = [
-      body.result,
-      body.numero,
-      body.id,
-      body.incidenteId,
-      body.reclamoId
-    ].find((value) => value !== undefined && value !== null && String(value).trim() !== '');
-
-    if (claimNumber) {
-      return `Numero de reclamo: ${claimNumber}`;
     }
 
     const candidates = [
@@ -392,6 +385,23 @@ function createFlowHelpers(dependencies) {
     }
 
     return `Respuesta API: ${candidates.join(' | ')}`;
+  }
+
+  function extractSubmissionClaimNumber(submission) {
+    const body = submission && submission.body;
+    if (!body || typeof body !== 'object') {
+      return '';
+    }
+
+    const claimNumber = [
+      body.result,
+      body.numero,
+      body.id,
+      body.incidenteId,
+      body.reclamoId
+    ].find((value) => value !== undefined && value !== null && String(value).trim() !== '');
+
+    return claimNumber == null ? '' : String(claimNumber);
   }
 
   function successMessage(submission) {
@@ -792,6 +802,7 @@ function createFlowHelpers(dependencies) {
             updateLightingContext(userId, {
               status: 'submitted_to_munidigital',
               completedAt: new Date().toISOString(),
+              claimNumber: extractSubmissionClaimNumber(submission),
               submission
             });
             setState(userId, FLOW_STATES.LIGHTING_SUBMITTED);

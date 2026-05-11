@@ -18,7 +18,6 @@ const WHATSAPP_BROWSER_PATH = process.env.WHATSAPP_BROWSER_PATH || findBrowserEx
 const DATA_FILE_PATH = process.env.DATA_FILE_PATH || path.join(__dirname, 'data', 'runtime-store.json');
 const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(__dirname, 'data', 'uploads');
 const CLAIM_TRACKING_WORKBOOK_PATH = process.env.CLAIM_TRACKING_WORKBOOK_PATH || path.join(__dirname, 'data', 'reports', 'seguimiento-reclamos.xls');
-const REGISTER_HELP_IMAGE_PATH = process.env.REGISTER_HELP_IMAGE_PATH || path.join(__dirname, 'data', 'assets', 'muniregistro_liviano.jpg');
 const LOG_MESSAGE_BODIES = process.env.LOG_MESSAGE_BODIES === 'true';
 const ADMIN_DEBUG_ENABLED = process.env.ADMIN_DEBUG_ENABLED !== 'false';
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
@@ -345,13 +344,6 @@ function replyMediaType(reply) {
 }
 
 function buildRegisterHelpReply(text) {
-  if (fs.existsSync(REGISTER_HELP_IMAGE_PATH)) {
-    return buildReply(text, {
-      mediaPath: REGISTER_HELP_IMAGE_PATH,
-      mediaType: 'image'
-    });
-  }
-
   return text;
 }
 
