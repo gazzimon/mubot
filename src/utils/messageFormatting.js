@@ -1,8 +1,8 @@
 const TEXT_STYLES = {
-  bold: ['**', '**'],
-  italic: ['*', '*'],
-  underline: ['__', '__'],
-  strikethrough: ['~~', '~~']
+  bold: ['*', '*'],
+  italic: ['_', '_'],
+  underline: ['', ''],
+  strikethrough: ['~', '~']
 };
 
 function normalizeTextFragment(value = '') {

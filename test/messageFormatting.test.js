@@ -11,25 +11,25 @@ const {
 } = require('../src/utils/messageFormatting');
 
 test('formatText applies bold markers', () => {
-  assert.equal(formatText('Hola', 'bold'), '**Hola**');
+  assert.equal(formatText('Hola', 'bold'), '*Hola*');
 });
 
 test('formatText applies italic markers', () => {
-  assert.equal(italic('Hola'), '*Hola*');
+  assert.equal(italic('Hola'), '_Hola_');
 });
 
-test('formatText applies underline markers', () => {
-  assert.equal(underline('MENU'), '__MENU__');
+test('underline returns plain text because WhatsApp does not support underline', () => {
+  assert.equal(underline('MENU'), 'MENU');
 });
 
 test('formatText applies strikethrough markers', () => {
-  assert.equal(strikethrough('Descartado'), '~~Descartado~~');
+  assert.equal(strikethrough('Descartado'), '~Descartado~');
 });
 
 test('joinFormattedText concatenates formatted fragments', () => {
   assert.equal(
     joinFormattedText(['Escriba ', underline('MENU'), ' para continuar.']),
-    'Escriba __MENU__ para continuar.'
+    'Escriba MENU para continuar.'
   );
 });
 
@@ -38,5 +38,5 @@ test('formatText returns plain text for unknown styles', () => {
 });
 
 test('bold helper keeps compatibility with existing string building', () => {
-  assert.equal(bold('Importante'), '**Importante**');
+  assert.equal(bold('Importante'), '*Importante*');
 });
