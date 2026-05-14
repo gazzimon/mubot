@@ -476,12 +476,25 @@ function createFlowHelpers(dependencies) {
   }
 
   function successMessage(submission) {
+    const claimNumber = extractSubmissionClaimNumber(submission);
+    if (claimNumber) {
+      return [
+        bold('Reclamo registrado correctamente.'),
+        '',
+        `Número: ${claimNumber}`,
+        '',
+        'Guarde este número para consultar el estado en MuniDigital.',
+        '',
+        `Si desea iniciar otro reclamo, escriba ${underline('MENU')}.`
+      ].join('\n');
+    }
+
     return [
-      bold('Su reclamo fue registrado correctamente en la plataforma MuniDigital.'),
+      bold('Reclamo registrado correctamente.'),
       '',
       formatSubmissionSummary(submission),
-      'Por favor conserve este número para seguir el trámite.',
-      `Si desea realizar otra gestión, escriba ${underline('MENU')}.`
+      '',
+      `Si desea iniciar otro reclamo, escriba ${underline('MENU')}.`
     ].join('\n');
   }
 

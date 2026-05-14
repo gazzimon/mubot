@@ -458,10 +458,10 @@ function phoneSupportMessage() {
 
 function operatorSupportMenuMessage() {
   return [
-    bold('Elija el tipo de atención que necesita:'),
+    bold('¿Cómo prefiere continuar?'),
     '',
-    '1. Atención telefónica',
-    '2. Chatear con un representante de atención al cliente',
+    '1. Ver teléfonos de atención',
+    '2. Esperar respuesta de un representante por este chat',
     '',
     `Escriba ${underline('MENU')} para volver al menu principal.`
   ].join('\n');
