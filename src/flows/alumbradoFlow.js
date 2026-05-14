@@ -63,6 +63,20 @@ function createFlowHelpers(dependencies) {
 
   function addressOrLocationMessage() {
     return withProgress([
+      'Escriba la dirección exacta del incidente dentro de Posadas.',
+      '',
+      'Necesitamos ubicar el lugar donde está el artefacto a reparar o modificar.',
+      '',
+      'Si está en el lugar, también puede compartir su ubicación actual desde WhatsApp.',
+      '',
+      'Si hay más de un artefacto afectado en lugares distintos, cargue un reclamo por cada uno.',
+      '',
+      italic('Ejemplo: Av. Corrientes 2030'),
+      '',
+      `Escriba ${underline('MENU')} para volver al menu principal.`
+    ].join('\n'), 2, 'Direccion del incidente');
+
+    return withProgress([
       'Indique la dirección exacta del incidente dentro de Posadas.',
       '',
       'También puede compartir su ubicación actual desde WhatsApp si está en el lugar.',
