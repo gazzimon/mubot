@@ -52,10 +52,18 @@ function getAddressText(item = {}) {
   return [firstLine, secondLine].filter(Boolean).join(', ') || normalizeString(item.display_name);
 }
 
+function getStreetAddressText(item = {}) {
+  const address = item.address || {};
+  const road = address.road || address.pedestrian || address.footway || address.cycleway || '';
+  const houseNumber = address.house_number || '';
+  return [road, houseNumber].filter(Boolean).join(' ').trim() || normalizeString(item.display_name);
+}
+
 function normalizeCandidate(item = {}) {
   const address = item.address || {};
   return {
     address: getAddressText(item),
+    displayAddress: getStreetAddressText(item),
     latitude: Number(item.lat),
     longitude: Number(item.lon),
     barrio: normalizeNeighborhoodLabel(address.suburb || address.neighbourhood || address.city_district || ''),

@@ -72,7 +72,10 @@ function createFlowHelpers(dependencies) {
     return withProgress([
       bold('Encontramos varias ubicaciones similares en Posadas.'),
       'Elija una opción:',
-      ...options.map((item, index) => `${index + 1}. ${item.address}`),
+      ...options.map((item, index) => {
+        const locationLink = buildLocationLink(item.latitude, item.longitude);
+        return `${index + 1}. ${formatAddressForLookup(item)}\nUbicación: ${locationLink}`;
+      }),
       `${options.length + 1}. Ninguna de estas`,
       '',
       `Escriba ${underline('MENU')} para volver al menu principal.`
@@ -83,11 +86,15 @@ function createFlowHelpers(dependencies) {
     return `https://www.google.com/maps?q=${encodeURIComponent(`${latitude},${longitude}`)}`;
   }
 
+  function formatAddressForLookup(candidate = {}) {
+    return candidate.displayAddress || candidate.address || 'Direccion no disponible';
+  }
+
   function addressConfirmationMessage(candidate) {
     const locationLink = buildLocationLink(candidate.latitude, candidate.longitude);
     return withProgress([
       bold('Encontré esta ubicación en Posadas:'),
-      candidate.address,
+      formatAddressForLookup(candidate),
       `Ubicación: ${locationLink}`,
       '',
       'Responda:',
