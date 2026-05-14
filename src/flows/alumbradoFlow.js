@@ -11,9 +11,11 @@ const FLOW_STATES = {
   LIGHTING_WAIT_PHOTO: 'LIGHTING_WAIT_PHOTO',
   LIGHTING_WAIT_INCIDENT_TYPE: 'LIGHTING_WAIT_INCIDENT_TYPE',
   LIGHTING_WAIT_DETAILS: 'LIGHTING_WAIT_DETAILS',
+  LIGHTING_CONFIRM_PHONE: 'LIGHTING_CONFIRM_PHONE',
   LIGHTING_WAIT_PHONE: 'LIGHTING_WAIT_PHONE',
   LIGHTING_WAIT_DNI: 'LIGHTING_WAIT_DNI',
   LIGHTING_CONFIRMATION: 'LIGHTING_CONFIRMATION',
+  LIGHTING_CORRECTION_MENU: 'LIGHTING_CORRECTION_MENU',
   LIGHTING_SUBMITTED: 'LIGHTING_SUBMITTED'
 };
 
@@ -25,6 +27,7 @@ function createFlowHelpers(dependencies) {
     updateSession,
     setState,
     getSession,
+    getPhoneCandidate,
     catalogEnvironment,
     saveImageFromIncoming,
     recordClaimTrackingEntry,
@@ -43,24 +46,44 @@ function createFlowHelpers(dependencies) {
 
   function lightingIntroMessage() {
     return withProgress([
-      bold('Vamos a ayudarle a registrar un reclamo en MuniDigital.'),
+      bold('Vamos a registrar un reclamo de alumbrado público en MuniDigital.'),
       '',
-      `Este reclamo tiene ${CLAIM_PROGRESS_TOTAL_STEPS} pasos. Le iremos indicando el avance en cada uno.`,
+      'Le vamos a pedir:',
+      '- Dirección o ubicación del incidente',
+      '- Foto del problema',
+      '- Tipo de problema',
+      '- Una breve descripción',
+      '- Datos de contacto',
       '',
-      'Primero identificaremos el área correspondiente. Luego le pediremos la ubicación, una foto y los datos mínimos para cargarlo.',
+      'Para comenzar, escriba 1.',
       '',
-      bold('Indique el área del reclamo:'),
-      '1. Alumbrado',
-      '2. Semáforos',
+      '1. Iniciar reclamo de alumbrado',
       '',
       `Escriba ${underline('MENU')} para volver al menu principal.`
-    ].join('\n'), 1, 'Area del reclamo');
+    ].join('\n'), 1, 'Inicio del reclamo');
   }
 
   function addressOrLocationMessage() {
     return withProgress([
       'Indique la dirección exacta del incidente dentro de Posadas.',
-      'Si está en el lugar, también puede compartir su ubicación.',
+      '',
+      'También puede compartir su ubicación actual desde WhatsApp si está en el lugar.',
+      '',
+      italic('Ejemplo: Av. Corrientes 2030.'),
+      '',
+      'Opciones:',
+      '1. Escribir dirección',
+      '2. Compartir ubicación actual',
+      '',
+      `Escriba ${underline('MENU')} para volver al menu principal.`
+    ].join('\n'), 2, 'Direccion del incidente');
+  }
+
+  function shareLocationMessage() {
+    return withProgress([
+      'Comparta su ubicación actual desde WhatsApp.',
+      '',
+      'Si prefiere escribir la dirección, envíela directamente en este chat.',
       '',
       italic('Ejemplo: Av. Corrientes 2030.'),
       '',
@@ -76,7 +99,8 @@ function createFlowHelpers(dependencies) {
         const locationLink = buildLocationLink(item.latitude, item.longitude);
         return `${index + 1}. ${formatAddressForLookup(item)}\nUbicación: ${locationLink}`;
       }),
-      `${options.length + 1}. Ninguna de estas`,
+      `${options.length + 1}. Ninguna de estas, quiero escribir otra dirección`,
+      `${options.length + 2}. Prefiero compartir mi ubicación actual`,
       '',
       `Escriba ${underline('MENU')} para volver al menu principal.`
     ].join('\n'), 2, 'Direccion del incidente');
@@ -157,9 +181,25 @@ function createFlowHelpers(dependencies) {
     ].join('\n'), 7, 'Telefono de contacto');
   }
 
+  function phoneSuggestionMessage(phone) {
+    return withProgress([
+      'Podemos usar este número como contacto:',
+      '',
+      phone,
+      '',
+      'Responda:',
+      '1. Confirmar este número',
+      '2. Cargar otro número',
+      '',
+      `Escriba ${underline('MENU')} para volver al menu principal.`
+    ].join('\n'), 7, 'Telefono de contacto');
+  }
+
   function dniRequestMessage() {
     return withProgress([
-      'Indique su DNI.',
+      'Para finalizar, indique su DNI.',
+      '',
+      'Este dato se utiliza para registrar el reclamo en MuniDigital y facilitar el seguimiento.',
       '',
       italic('Ejemplo: 37770375'),
       '',
@@ -193,8 +233,12 @@ function createFlowHelpers(dependencies) {
     return withProgress([
       bold('No pudimos ubicar esa dirección dentro de Posadas.'),
       '',
-      'Por favor escriba la dirección más completa o comparta su ubicación actual.',
-      italic('Ejemplo: Av. Corrientes 2030, Centro.')
+      'Puede intentar de estas formas:',
+      '',
+      '1. Escribir una dirección más completa',
+      '2. Compartir su ubicación actual desde WhatsApp',
+      '',
+      italic('Ejemplo: Av. Corrientes 2030.')
     ].join('\n'), 2, 'Direccion del incidente');
   }
 
@@ -202,8 +246,12 @@ function createFlowHelpers(dependencies) {
     return withProgress([
       bold('La dirección parece incompleta o poco precisa.'),
       '',
-      'Agregue altura, barrio o una referencia, o comparta su ubicación actual.',
-      italic('Ejemplo: Av. Corrientes 2030, Centro.')
+      'Puede intentar de estas formas:',
+      '',
+      '1. Escribir una dirección con altura o referencia',
+      '2. Compartir su ubicación actual desde WhatsApp',
+      '',
+      italic('Ejemplo: Av. Corrientes 2030.')
     ].join('\n'), 2, 'Direccion del incidente');
   }
 
@@ -211,11 +259,13 @@ function createFlowHelpers(dependencies) {
     return withProgress([
       bold('Todavía no pudimos validar la dirección con precisión dentro de Posadas.'),
       '',
-      joinFormattedText([
-        'Para continuar, comparta su ubicación actual o escriba ',
-        underline('MENU'),
-        ' para volver al menu principal.'
-      ])
+      'Puede intentar de estas formas:',
+      '',
+      '1. Escribir una dirección más completa',
+      '2. Compartir su ubicación actual desde WhatsApp',
+      '3. Volver al menu principal',
+      '',
+      italic('Ejemplo: Av. Corrientes 2030.')
     ].join('\n'), 2, 'Direccion del incidente');
   }
 
@@ -433,26 +483,60 @@ function createFlowHelpers(dependencies) {
     updateLightingContext(userId, { payloadPreview: payload });
 
     return [
-      bold(`Completó los ${CLAIM_PROGRESS_TOTAL_STEPS} pasos del reclamo.`),
+      bold('Revisemos el reclamo antes de enviarlo'),
       '',
-      bold('Revise los datos del reclamo:'),
-      '',
-      `Área: ${serviceArea ? serviceArea.label : 'No informada'}`,
-      `Dirección: ${claim.address}`,
-      `Barrio: ${claim.neighborhood}`,
+      `Dirección: ${formatAddressForLookup({ address: claim.address, displayAddress: claim.displayAddress })}`,
       `Ubicación: ${locationLink}`,
-      `Foto adjunta: ${claim.photo ? 'Sí' : 'No'}`,
       `Tipo: ${incidentType ? incidentType.label : 'No informado'}`,
-      `Observaciones: ${claim.observations}`,
+      `Detalle: ${claim.observations}`,
+      `Foto: ${claim.photo ? 'Sí' : 'No'}`,
       `Teléfono: ${claim.phone}`,
       `DNI: ${claim.dni}`,
       '',
       'Responda:',
-      '1. Confirmar',
-      '2. Cancelar',
+      '1. Confirmar y enviar',
+      '2. Corregir un dato',
+      '3. Cancelar',
       '',
       `Escriba ${underline('MENU')} para volver al menu principal.`
     ].join('\n');
+  }
+
+  function correctionMenuMessage() {
+    return [
+      bold('¿Qué dato desea corregir?'),
+      '',
+      '1. Dirección o ubicación',
+      '2. Foto',
+      '3. Tipo de incidente',
+      '4. Descripción del problema',
+      '5. Teléfono',
+      '6. DNI',
+      '7. Volver al resumen',
+      '',
+      `Escriba ${underline('MENU')} para volver al menu principal.`
+    ].join('\n');
+  }
+
+  function returnToSummaryAfterCorrection(userId, message) {
+    const claim = getLightingContext(userId);
+    if (!claim.returnToSummaryAfterCorrection) {
+      return null;
+    }
+
+    updateLightingContext(userId, { returnToSummaryAfterCorrection: false });
+    setState(userId, FLOW_STATES.LIGHTING_CONFIRMATION);
+    return [message, '', summaryMessage(userId)].join('\n');
+  }
+
+  function continueAfterCorrectionOrNext(userId, nextState, nextMessage, updatedMessage) {
+    const correctionMessage = returnToSummaryAfterCorrection(userId, updatedMessage);
+    if (correctionMessage) {
+      return correctionMessage;
+    }
+
+    setState(userId, nextState);
+    return nextMessage;
   }
 
   async function resolveAddressCandidate(text, options) {
@@ -533,9 +617,11 @@ function createFlowHelpers(dependencies) {
         FLOW_STATES.LIGHTING_WAIT_PHOTO,
         FLOW_STATES.LIGHTING_WAIT_INCIDENT_TYPE,
         FLOW_STATES.LIGHTING_WAIT_DETAILS,
+        FLOW_STATES.LIGHTING_CONFIRM_PHONE,
         FLOW_STATES.LIGHTING_WAIT_PHONE,
         FLOW_STATES.LIGHTING_WAIT_DNI,
         FLOW_STATES.LIGHTING_CONFIRMATION,
+        FLOW_STATES.LIGHTING_CORRECTION_MENU,
         FLOW_STATES.LIGHTING_SUBMITTED
       ].includes(session.state) &&
       !hasConfirmedLocation(claim)
@@ -569,10 +655,12 @@ function createFlowHelpers(dependencies) {
           serviceAreaLabel: serviceArea.label,
           photo: null,
           address: '',
+          displayAddress: '',
           neighborhood: '',
           observations: '',
           phone: '',
           dni: '',
+          returnToSummaryAfterCorrection: false,
           addressAttempts: 0
         });
         setState(userId, FLOW_STATES.CLAIM_WAIT_ADDRESS_OR_LOCATION);
@@ -580,6 +668,20 @@ function createFlowHelpers(dependencies) {
       }
 
       case FLOW_STATES.CLAIM_WAIT_ADDRESS_OR_LOCATION: {
+        if (text === '1') {
+          return addressOrLocationMessage();
+        }
+
+        if (text === '2') {
+          return shareLocationMessage();
+        }
+
+        if (text === '3') {
+          clearLightingContext(userId);
+          setState(userId, 'MAIN_MENU');
+          return 'Volvimos al menu principal. Escriba MENU para verlo nuevamente.';
+        }
+
         if (options.location) {
           try {
             const candidate = await resolveLocationCandidate(options.location);
@@ -641,11 +743,16 @@ function createFlowHelpers(dependencies) {
             return addressAttemptsExceededMessage();
           }
 
-          return [
+          return withProgress([
             'No pudimos validar la dirección en este momento.',
             '',
-            'Intente nuevamente en unos instantes o comparta su ubicación actual.'
-          ].join('\n');
+            'Puede intentar de estas formas:',
+            '',
+            '1. Escribir una dirección más completa',
+            '2. Compartir su ubicación actual desde WhatsApp',
+            '',
+            'Intente nuevamente en unos instantes.'
+          ].join('\n'), 2, 'Direccion del incidente');
         }
       }
 
@@ -654,13 +761,18 @@ function createFlowHelpers(dependencies) {
         const optionsList = Array.isArray(currentClaim.addressOptions) ? currentClaim.addressOptions : [];
         const selection = Number(text);
 
-        if (!Number.isInteger(selection) || selection < 1 || selection > optionsList.length + 1) {
+        if (!Number.isInteger(selection) || selection < 1 || selection > optionsList.length + 2) {
           return retryMessage(addressDisambiguationMessage(optionsList));
         }
 
         if (selection === optionsList.length + 1) {
           setState(userId, FLOW_STATES.CLAIM_WAIT_ADDRESS_OR_LOCATION);
           return addressOrLocationMessage();
+        }
+
+        if (selection === optionsList.length + 2) {
+          setState(userId, FLOW_STATES.CLAIM_WAIT_ADDRESS_OR_LOCATION);
+          return shareLocationMessage();
         }
 
         const candidate = optionsList[selection - 1];
@@ -683,6 +795,7 @@ function createFlowHelpers(dependencies) {
 
           updateLightingContext(userId, {
             address: candidate.address,
+            displayAddress: formatAddressForLookup(candidate),
             location: {
               latitude: candidate.latitude,
               longitude: candidate.longitude
@@ -692,8 +805,12 @@ function createFlowHelpers(dependencies) {
             addressOptions: null
           });
           if (isNeighborhoodKnown(candidate.barrio)) {
-            setState(userId, FLOW_STATES.LIGHTING_WAIT_PHOTO);
-            return photoRequestMessage();
+            return continueAfterCorrectionOrNext(
+              userId,
+              FLOW_STATES.LIGHTING_WAIT_PHOTO,
+              photoRequestMessage(),
+              'Dirección actualizada.'
+            );
           }
 
           setState(userId, FLOW_STATES.CLAIM_WAIT_NEIGHBORHOOD);
@@ -717,8 +834,12 @@ function createFlowHelpers(dependencies) {
         }
 
         updateLightingContext(userId, { neighborhood: text });
-        setState(userId, FLOW_STATES.LIGHTING_WAIT_PHOTO);
-        return photoRequestMessage();
+        return continueAfterCorrectionOrNext(
+          userId,
+          FLOW_STATES.LIGHTING_WAIT_PHOTO,
+          photoRequestMessage(),
+          'Barrio actualizado.'
+        );
 
       case FLOW_STATES.LIGHTING_WAIT_PHOTO: {
         const photo = await saveImageFromIncoming(options);
@@ -727,8 +848,12 @@ function createFlowHelpers(dependencies) {
         }
 
         updateLightingContext(userId, { photo });
-        setState(userId, FLOW_STATES.LIGHTING_WAIT_INCIDENT_TYPE);
-        return incidentTypeMessage(getServiceAreaByKey(getLightingContext(userId).serviceArea));
+        return continueAfterCorrectionOrNext(
+          userId,
+          FLOW_STATES.LIGHTING_WAIT_INCIDENT_TYPE,
+          incidentTypeMessage(getServiceAreaByKey(getLightingContext(userId).serviceArea)),
+          'Foto actualizada.'
+        );
       }
 
       case FLOW_STATES.LIGHTING_WAIT_INCIDENT_TYPE: {
@@ -744,8 +869,12 @@ function createFlowHelpers(dependencies) {
           incidentTypeId: incidentType.id,
           incidentTypeLabel: incidentType.label
         });
-        setState(userId, FLOW_STATES.LIGHTING_WAIT_DETAILS);
-        return detailsMessage();
+        return continueAfterCorrectionOrNext(
+          userId,
+          FLOW_STATES.LIGHTING_WAIT_DETAILS,
+          detailsMessage(),
+          'Tipo de incidente actualizado.'
+        );
       }
 
       case FLOW_STATES.LIGHTING_WAIT_DETAILS:
@@ -754,8 +883,46 @@ function createFlowHelpers(dependencies) {
         }
 
         updateLightingContext(userId, { observations: text });
+        {
+          const correctionMessage = returnToSummaryAfterCorrection(userId, 'Descripción actualizada.');
+          if (correctionMessage) {
+            return correctionMessage;
+          }
+        }
+
+        {
+          const suggestedPhone = normalizePhone(getPhoneCandidate(userId, options));
+          if (isValidPhone(suggestedPhone)) {
+            updateLightingContext(userId, { suggestedPhone });
+            setState(userId, FLOW_STATES.LIGHTING_CONFIRM_PHONE);
+            return phoneSuggestionMessage(suggestedPhone);
+          }
+        }
+
         setState(userId, FLOW_STATES.LIGHTING_WAIT_PHONE);
         return phoneRequestMessage();
+
+      case FLOW_STATES.LIGHTING_CONFIRM_PHONE: {
+        const currentClaim = getLightingContext(userId);
+        const suggestedPhone = normalizePhone(currentClaim.suggestedPhone);
+
+        if (text === '1' && isValidPhone(suggestedPhone)) {
+          updateLightingContext(userId, { phone: suggestedPhone });
+          return continueAfterCorrectionOrNext(
+            userId,
+            FLOW_STATES.LIGHTING_WAIT_DNI,
+            dniRequestMessage(),
+            'Teléfono actualizado.'
+          );
+        }
+
+        if (text === '2') {
+          setState(userId, FLOW_STATES.LIGHTING_WAIT_PHONE);
+          return phoneRequestMessage();
+        }
+
+        return retryMessage(phoneSuggestionMessage(suggestedPhone || 'No disponible'));
+      }
 
       case FLOW_STATES.LIGHTING_WAIT_PHONE:
         if (!isValidPhone(text)) {
@@ -763,8 +930,12 @@ function createFlowHelpers(dependencies) {
         }
 
         updateLightingContext(userId, { phone: normalizePhone(text) });
-        setState(userId, FLOW_STATES.LIGHTING_WAIT_DNI);
-        return dniRequestMessage();
+        return continueAfterCorrectionOrNext(
+          userId,
+          FLOW_STATES.LIGHTING_WAIT_DNI,
+          dniRequestMessage(),
+          'Teléfono actualizado.'
+        );
 
       case FLOW_STATES.LIGHTING_WAIT_DNI:
         if (!isValidDni(text)) {
@@ -772,8 +943,12 @@ function createFlowHelpers(dependencies) {
         }
 
         updateLightingContext(userId, { dni: normalizeDni(text) });
-        setState(userId, FLOW_STATES.LIGHTING_CONFIRMATION);
-        return summaryMessage(userId);
+        return continueAfterCorrectionOrNext(
+          userId,
+          FLOW_STATES.LIGHTING_CONFIRMATION,
+          summaryMessage(userId),
+          'DNI actualizado.'
+        );
 
       case FLOW_STATES.LIGHTING_CONFIRMATION:
         if (text === '1') {
@@ -847,12 +1022,61 @@ function createFlowHelpers(dependencies) {
         }
 
         if (text === '2') {
+          setState(userId, FLOW_STATES.LIGHTING_CORRECTION_MENU);
+          return correctionMenuMessage();
+        }
+
+        if (text === '3') {
           clearLightingContext(userId);
           setState(userId, 'MAIN_MENU');
           return `El reclamo fue cancelado. Escriba ${underline('MENU')} para volver a comenzar.`;
         }
 
         return retryMessage(summaryMessage(userId));
+
+      case FLOW_STATES.LIGHTING_CORRECTION_MENU:
+        if (text === '1') {
+          updateLightingContext(userId, { returnToSummaryAfterCorrection: true });
+          setState(userId, FLOW_STATES.CLAIM_WAIT_ADDRESS_OR_LOCATION);
+          return addressOrLocationMessage();
+        }
+
+        if (text === '2') {
+          updateLightingContext(userId, { returnToSummaryAfterCorrection: true });
+          setState(userId, FLOW_STATES.LIGHTING_WAIT_PHOTO);
+          return photoRequestMessage();
+        }
+
+        if (text === '3') {
+          updateLightingContext(userId, { returnToSummaryAfterCorrection: true });
+          setState(userId, FLOW_STATES.LIGHTING_WAIT_INCIDENT_TYPE);
+          return incidentTypeMessage(getServiceAreaByKey(getLightingContext(userId).serviceArea));
+        }
+
+        if (text === '4') {
+          updateLightingContext(userId, { returnToSummaryAfterCorrection: true });
+          setState(userId, FLOW_STATES.LIGHTING_WAIT_DETAILS);
+          return detailsMessage();
+        }
+
+        if (text === '5') {
+          updateLightingContext(userId, { returnToSummaryAfterCorrection: true });
+          setState(userId, FLOW_STATES.LIGHTING_WAIT_PHONE);
+          return phoneRequestMessage();
+        }
+
+        if (text === '6') {
+          updateLightingContext(userId, { returnToSummaryAfterCorrection: true });
+          setState(userId, FLOW_STATES.LIGHTING_WAIT_DNI);
+          return dniRequestMessage();
+        }
+
+        if (text === '7') {
+          setState(userId, FLOW_STATES.LIGHTING_CONFIRMATION);
+          return summaryMessage(userId);
+        }
+
+        return retryMessage(correctionMenuMessage());
 
       case FLOW_STATES.LIGHTING_SUBMITTED:
         setState(userId, 'MAIN_MENU');
