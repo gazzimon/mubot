@@ -469,7 +469,7 @@ function operatorSupportMenuMessage() {
 
 function operatorContactMessage() {
   return [
-    bold('Su consulta será derivada a una oficial de atención al vecino.'),
+    bold('Su consulta será derivada al equipo de atención al vecino.'),
     '',
     bold('Horario de atención:'),
     'Lunes a viernes de 07:00 a 19:00 hs',

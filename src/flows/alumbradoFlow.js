@@ -75,20 +75,6 @@ function createFlowHelpers(dependencies) {
       '',
       `Escriba ${underline('MENU')} para volver al menu principal.`
     ].join('\n'), 2, 'Direccion del incidente');
-
-    return withProgress([
-      'Indique la dirección exacta del incidente dentro de Posadas.',
-      '',
-      'También puede compartir su ubicación actual desde WhatsApp si está en el lugar.',
-      '',
-      italic('Ejemplo: Av. Corrientes 2030.'),
-      '',
-      'Opciones:',
-      '1. Escribir dirección',
-      '2. Compartir ubicación actual',
-      '',
-      `Escriba ${underline('MENU')} para volver al menu principal.`
-    ].join('\n'), 2, 'Direccion del incidente');
   }
 
   function shareLocationMessage() {
@@ -112,7 +98,8 @@ function createFlowHelpers(dependencies) {
         return `${index + 1}. ${formatAddressForLookup(item)}\nUbicación: ${locationLink}`;
       }),
       `${options.length + 1}. Ninguna de estas, quiero escribir otra dirección`,
-      `${options.length + 2}. Prefiero compartir mi ubicación actual`,
+      '',
+      'También puede compartir su ubicación actual desde WhatsApp.',
       '',
       `Escriba ${underline('MENU')} para volver al menu principal.`
     ].join('\n'), 2, 'Direccion del incidente');
@@ -132,6 +119,8 @@ function createFlowHelpers(dependencies) {
       bold('Encontré esta ubicación en Posadas:'),
       formatAddressForLookup(candidate),
       `Ubicación: ${locationLink}`,
+      '',
+      'Revise que el punto del mapa corresponda al lugar exacto del artefacto.',
       '',
       'Responda:',
       '1. Confirmar esta ubicación',
@@ -160,6 +149,7 @@ function createFlowHelpers(dependencies) {
       'Ahora envíe una foto del incidente.',
       '',
       'La foto debe mostrar el artefacto a reparar o modificar y es obligatoria para cargar el reclamo.',
+      'Si es posible, incluya una referencia del lugar.',
       '',
       `Escriba ${underline('MENU')} para volver al menu principal.`
     ].join('\n'), 4, 'Foto del incidente');
@@ -178,8 +168,9 @@ function createFlowHelpers(dependencies) {
   function detailsMessage() {
     return withProgress([
       'Describa brevemente el problema.',
+      'No hace falta repetir la dirección.',
       '',
-      italic('Ejemplo: Hace tres días que está apagada.'),
+      italic('Ejemplo: La luminaria está apagada desde hace tres días.'),
       '',
       `Escriba ${underline('MENU')} para volver al menu principal.`
     ].join('\n'), 6, 'Descripcion del problema');
@@ -187,7 +178,7 @@ function createFlowHelpers(dependencies) {
 
   function phoneRequestMessage() {
     return withProgress([
-      'Indique su número de teléfono con característica.',
+      'Indique un teléfono de contacto con característica.',
       '',
       italic('Ejemplo: 3765123456'),
       '',
@@ -200,6 +191,8 @@ function createFlowHelpers(dependencies) {
       'Para finalizar, indique su DNI.',
       '',
       'Este dato se utiliza para registrar el reclamo en MuniDigital y facilitar el seguimiento.',
+      '',
+      'Ingrese solo números, sin puntos.',
       '',
       italic('Ejemplo: 37770375'),
       '',
@@ -293,7 +286,11 @@ function createFlowHelpers(dependencies) {
     return [
       bold('No pudimos enviar el reclamo a MuniDigital en este momento.'),
       '',
-      'Responda 1 para reintentar el envío o 2 para cancelar.',
+      'Sus datos quedaron guardados en esta conversación.',
+      '',
+      'Responda:',
+      '1. Reintentar envío',
+      '2. Cancelar',
       '',
       `Escriba ${underline('MENU')} para volver al menu principal.`
     ].join('\n');
@@ -509,6 +506,8 @@ function createFlowHelpers(dependencies) {
       `Foto: ${claim.photo ? 'Sí' : 'No'}`,
       `Teléfono: ${claim.phone}`,
       `DNI: ${claim.dni}`,
+      '',
+      'Si todo está correcto, confirme el envío.',
       '',
       'Responda:',
       '1. Confirmar y enviar',
@@ -777,18 +776,13 @@ function createFlowHelpers(dependencies) {
         const optionsList = Array.isArray(currentClaim.addressOptions) ? currentClaim.addressOptions : [];
         const selection = Number(text);
 
-        if (!Number.isInteger(selection) || selection < 1 || selection > optionsList.length + 2) {
+        if (!Number.isInteger(selection) || selection < 1 || selection > optionsList.length + 1) {
           return retryMessage(addressDisambiguationMessage(optionsList));
         }
 
         if (selection === optionsList.length + 1) {
           setState(userId, FLOW_STATES.CLAIM_WAIT_ADDRESS_OR_LOCATION);
           return addressOrLocationMessage();
-        }
-
-        if (selection === optionsList.length + 2) {
-          setState(userId, FLOW_STATES.CLAIM_WAIT_ADDRESS_OR_LOCATION);
-          return shareLocationMessage();
         }
 
         const candidate = optionsList[selection - 1];
