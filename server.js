@@ -15,6 +15,8 @@ const WHATSAPP_ENABLED = process.env.WHATSAPP_ENABLED === 'true';
 const WHATSAPP_AUTH_DIR = process.env.WHATSAPP_AUTH_DIR || path.join(__dirname, '.wwebjs_auth');
 const WHATSAPP_PRINT_QR = process.env.WHATSAPP_PRINT_QR !== 'false';
 const WHATSAPP_BROWSER_PATH = process.env.WHATSAPP_BROWSER_PATH || findBrowserExecutable();
+const WHATSAPP_HEADLESS = process.env.WHATSAPP_HEADLESS !== 'false';
+const WHATSAPP_READY_TIMEOUT_MS = Number(process.env.WHATSAPP_READY_TIMEOUT_MS || '90000');
 const DATA_FILE_PATH = process.env.DATA_FILE_PATH || path.join(__dirname, 'data', 'runtime-store.json');
 const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(__dirname, 'data', 'uploads');
 const CLAIM_TRACKING_WORKBOOK_PATH = process.env.CLAIM_TRACKING_WORKBOOK_PATH || path.join(__dirname, 'data', 'reports', 'seguimiento-reclamos.xls');
@@ -789,14 +791,26 @@ async function startWhatsAppBridge() {
     return;
   }
 
+  let readyTimeout = null;
+
+  function updateWhatsAppEvent(event) {
+    whatsappRuntime.lastClientEvent = {
+      ...event,
+      timestamp: new Date().toISOString()
+    };
+  }
+
   const client = new Client({
     authStrategy: new LocalAuth({
       dataPath: WHATSAPP_AUTH_DIR
     }),
     puppeteer: {
-      headless: true,
+      headless: WHATSAPP_HEADLESS,
       executablePath: WHATSAPP_BROWSER_PATH || undefined,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      handleSIGINT: false,
+      handleSIGTERM: false,
+      handleSIGHUP: false,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
     }
   });
 
@@ -809,13 +823,31 @@ async function startWhatsAppBridge() {
     console.log('No se encontro Chrome o Edge local. Puppeteer intentara usar su cache.');
   }
 
+  readyTimeout = setTimeout(() => {
+    if (whatsappRuntime.status === 'connected') {
+      return;
+    }
+
+    whatsappRuntime.status = 'ready_timeout';
+    updateWhatsAppEvent({
+      type: 'ready_timeout',
+      authDir: WHATSAPP_AUTH_DIR
+    });
+    console.error(
+      `WhatsApp no llego a ready despues de ${WHATSAPP_READY_TIMEOUT_MS}ms. ` +
+      `Estado actual: ${whatsappRuntime.status}. ` +
+      'Si aparece como autenticado pero no conectado, probablemente la sesion local quedo inconsistente.'
+    );
+  }, WHATSAPP_READY_TIMEOUT_MS);
+  readyTimeout.unref();
+
   client.on('qr', (qr) => {
     whatsappRuntime.status = 'qr_pending';
     whatsappRuntime.lastQrAt = new Date().toISOString();
-    whatsappRuntime.lastClientEvent = {
+    updateWhatsAppEvent({
       type: 'qr',
       timestamp: whatsappRuntime.lastQrAt
-    };
+    });
 
     console.log('QR recibido. Escanealo desde WhatsApp > Dispositivos vinculados.');
     if (qrcode) {
@@ -825,50 +857,72 @@ async function startWhatsAppBridge() {
 
   client.on('loading_screen', (percent, message) => {
     whatsappRuntime.status = 'loading';
-    whatsappRuntime.lastClientEvent = {
+    updateWhatsAppEvent({
       type: 'loading_screen',
-      timestamp: new Date().toISOString(),
       percent,
       message
-    };
+    });
     console.log(`WhatsApp cargando: ${percent}% ${message}`);
   });
 
   client.on('authenticated', () => {
     whatsappRuntime.status = 'authenticated';
-    whatsappRuntime.lastClientEvent = {
-      type: 'authenticated',
-      timestamp: new Date().toISOString()
-    };
+    updateWhatsAppEvent({ type: 'authenticated' });
     console.log('WhatsApp autenticado.');
   });
 
   client.on('ready', () => {
     whatsappRuntime.status = 'connected';
-    whatsappRuntime.lastClientEvent = {
+    if (readyTimeout) {
+      clearTimeout(readyTimeout);
+      readyTimeout = null;
+    }
+
+    updateWhatsAppEvent({
       type: 'ready',
-      timestamp: new Date().toISOString()
-    };
-    console.log('WhatsApp conectado.');
+      pushname: client.info && client.info.pushname ? client.info.pushname : ''
+    });
+    console.log(`WhatsApp conectado${client.info && client.info.pushname ? ` como ${client.info.pushname}` : ''}.`);
+  });
+
+  client.on('change_state', (state) => {
+    updateWhatsAppEvent({
+      type: 'change_state',
+      state: String(state)
+    });
+    console.log(`WhatsApp estado interno: ${state}`);
+  });
+
+  client.on('remote_session_saved', () => {
+    updateWhatsAppEvent({ type: 'remote_session_saved' });
+    console.log('WhatsApp guardo la sesion remota.');
   });
 
   client.on('auth_failure', (message) => {
     whatsappRuntime.status = 'auth_failure';
-    whatsappRuntime.lastClientEvent = {
+    if (readyTimeout) {
+      clearTimeout(readyTimeout);
+      readyTimeout = null;
+    }
+
+    updateWhatsAppEvent({
       type: 'auth_failure',
-      timestamp: new Date().toISOString(),
       message
-    };
+    });
     console.error(`Fallo de autenticacion de WhatsApp: ${message}`);
   });
 
   client.on('disconnected', (reason) => {
     whatsappRuntime.status = 'disconnected';
-    whatsappRuntime.lastClientEvent = {
+    if (readyTimeout) {
+      clearTimeout(readyTimeout);
+      readyTimeout = null;
+    }
+
+    updateWhatsAppEvent({
       type: 'disconnected',
-      timestamp: new Date().toISOString(),
       reason: String(reason)
-    };
+    });
     console.error(`WhatsApp desconectado: ${reason}`);
   });
 
@@ -1051,17 +1105,67 @@ server.on('error', (error) => {
   process.exit(1);
 });
 
-process.on('SIGINT', async () => {
-  console.log('Cerrando servidor...');
+let shutdownInProgress = false;
+
+async function closeWhatsAppClient() {
+  const client = whatsappRuntime.client;
+  whatsappRuntime.client = null;
+
+  if (!client) {
+    return;
+  }
+
+  const browser = client.pupBrowser;
+  if (browser && typeof browser.close === 'function') {
+    await browser.close();
+    return;
+  }
+
+  await client.destroy();
+}
+
+function closeHttpServer() {
+  return new Promise((resolve) => {
+    server.close(() => resolve());
+  });
+}
+
+async function shutdown(signal) {
+  if (shutdownInProgress) {
+    return;
+  }
+
+  shutdownInProgress = true;
+  console.log(`Cerrando servidor (${signal})...`);
+
+  const forceExitTimeout = setTimeout(() => {
+    console.error('El cierre demoro demasiado. Finalizando proceso.');
+    process.exit(1);
+  }, 8000);
+  forceExitTimeout.unref();
+
   try {
-    if (whatsappRuntime.client) {
-      await whatsappRuntime.client.destroy();
-    }
+    await closeWhatsAppClient();
   } catch (error) {
     console.error('Error cerrando cliente de WhatsApp:', error);
-  } finally {
-    process.exit(0);
   }
+
+  try {
+    await closeHttpServer();
+  } catch (error) {
+    console.error('Error cerrando servidor HTTP:', error);
+  }
+
+  clearTimeout(forceExitTimeout);
+  process.exit(0);
+}
+
+process.on('SIGINT', () => {
+  shutdown('SIGINT');
+});
+
+process.on('SIGTERM', () => {
+  shutdown('SIGTERM');
 });
 
 startWhatsAppBridge().catch((error) => {
