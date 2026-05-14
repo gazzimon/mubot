@@ -11,7 +11,6 @@ const FLOW_STATES = {
   LIGHTING_WAIT_PHOTO: 'LIGHTING_WAIT_PHOTO',
   LIGHTING_WAIT_INCIDENT_TYPE: 'LIGHTING_WAIT_INCIDENT_TYPE',
   LIGHTING_WAIT_DETAILS: 'LIGHTING_WAIT_DETAILS',
-  LIGHTING_CONFIRM_PHONE: 'LIGHTING_CONFIRM_PHONE',
   LIGHTING_WAIT_PHONE: 'LIGHTING_WAIT_PHONE',
   LIGHTING_WAIT_DNI: 'LIGHTING_WAIT_DNI',
   LIGHTING_CONFIRMATION: 'LIGHTING_CONFIRMATION',
@@ -27,7 +26,6 @@ function createFlowHelpers(dependencies) {
     updateSession,
     setState,
     getSession,
-    getPhoneCandidate,
     catalogEnvironment,
     saveImageFromIncoming,
     recordClaimTrackingEntry,
@@ -182,6 +180,8 @@ function createFlowHelpers(dependencies) {
   }
 
   function phoneSuggestionMessage(phone) {
+    return phoneRequestMessage();
+
     return withProgress([
       'Podemos usar este número como contacto:',
       '',
@@ -617,7 +617,6 @@ function createFlowHelpers(dependencies) {
         FLOW_STATES.LIGHTING_WAIT_PHOTO,
         FLOW_STATES.LIGHTING_WAIT_INCIDENT_TYPE,
         FLOW_STATES.LIGHTING_WAIT_DETAILS,
-        FLOW_STATES.LIGHTING_CONFIRM_PHONE,
         FLOW_STATES.LIGHTING_WAIT_PHONE,
         FLOW_STATES.LIGHTING_WAIT_DNI,
         FLOW_STATES.LIGHTING_CONFIRMATION,
@@ -890,19 +889,13 @@ function createFlowHelpers(dependencies) {
           }
         }
 
-        {
-          const suggestedPhone = normalizePhone(getPhoneCandidate(userId, options));
-          if (isValidPhone(suggestedPhone)) {
-            updateLightingContext(userId, { suggestedPhone });
-            setState(userId, FLOW_STATES.LIGHTING_CONFIRM_PHONE);
-            return phoneSuggestionMessage(suggestedPhone);
-          }
-        }
-
         setState(userId, FLOW_STATES.LIGHTING_WAIT_PHONE);
         return phoneRequestMessage();
 
-      case FLOW_STATES.LIGHTING_CONFIRM_PHONE: {
+      case 'LIGHTING_CONFIRM_PHONE': {
+        setState(userId, FLOW_STATES.LIGHTING_WAIT_PHONE);
+        return phoneRequestMessage();
+
         const currentClaim = getLightingContext(userId);
         const suggestedPhone = normalizePhone(currentClaim.suggestedPhone);
 
