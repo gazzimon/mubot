@@ -134,8 +134,8 @@ function createFlowHelpers(dependencies) {
       `Ubicación: ${locationLink}`,
       '',
       'Responda:',
-      '1. Confirmar dirección',
-      '2. Corregir dirección',
+      '1. Confirmar esta ubicación',
+      '2. Escribir otra dirección',
       '',
       `Escriba ${underline('MENU')} para volver al menu principal.`
     ].join('\n'), 3, 'Confirmacion de ubicacion');
@@ -158,6 +158,8 @@ function createFlowHelpers(dependencies) {
       bold('Dirección confirmada.'),
       '',
       'Ahora envíe una foto del incidente.',
+      '',
+      'La foto debe mostrar el artefacto a reparar o modificar y es obligatoria para cargar el reclamo.',
       '',
       `Escriba ${underline('MENU')} para volver al menu principal.`
     ].join('\n'), 4, 'Foto del incidente');
@@ -193,22 +195,6 @@ function createFlowHelpers(dependencies) {
     ].join('\n'), 7, 'Telefono de contacto');
   }
 
-  function phoneSuggestionMessage(phone) {
-    return phoneRequestMessage();
-
-    return withProgress([
-      'Podemos usar este número como contacto:',
-      '',
-      phone,
-      '',
-      'Responda:',
-      '1. Confirmar este número',
-      '2. Cargar otro número',
-      '',
-      `Escriba ${underline('MENU')} para volver al menu principal.`
-    ].join('\n'), 7, 'Telefono de contacto');
-  }
-
   function dniRequestMessage() {
     return withProgress([
       'Para finalizar, indique su DNI.',
@@ -239,7 +225,11 @@ function createFlowHelpers(dependencies) {
     return withProgress([
       bold('Necesito una foto válida del incidente para continuar.'),
       '',
-      'Por favor envíe una imagen desde su teléfono.'
+      'Desde WhatsApp, toque el ícono de adjuntar o la cámara y envíe una imagen del artefacto.',
+      '',
+      'La foto es obligatoria para cargar el reclamo.',
+      '',
+      `Escriba ${underline('MENU')} para volver al menu principal.`
     ].join('\n'), 4, 'Foto del incidente');
   }
 
@@ -515,7 +505,7 @@ function createFlowHelpers(dependencies) {
       `Dirección: ${formatAddressForLookup({ address: claim.address, displayAddress: claim.displayAddress })}`,
       `Ubicación: ${locationLink}`,
       `Tipo: ${incidentType ? incidentType.label : 'No informado'}`,
-      `Detalle: ${claim.observations}`,
+      `Descripción: ${claim.observations}`,
       `Foto: ${claim.photo ? 'Sí' : 'No'}`,
       `Teléfono: ${claim.phone}`,
       `DNI: ${claim.dni}`,
@@ -534,10 +524,10 @@ function createFlowHelpers(dependencies) {
       bold('¿Qué dato desea corregir?'),
       '',
       '1. Dirección o ubicación',
-      '2. Foto',
+      '2. Foto del incidente',
       '3. Tipo de incidente',
       '4. Descripción del problema',
-      '5. Teléfono',
+      '5. Teléfono de contacto',
       '6. DNI',
       '7. Volver al resumen',
       '',
@@ -918,31 +908,6 @@ function createFlowHelpers(dependencies) {
 
         setState(userId, FLOW_STATES.LIGHTING_WAIT_PHONE);
         return phoneRequestMessage();
-
-      case 'LIGHTING_CONFIRM_PHONE': {
-        setState(userId, FLOW_STATES.LIGHTING_WAIT_PHONE);
-        return phoneRequestMessage();
-
-        const currentClaim = getLightingContext(userId);
-        const suggestedPhone = normalizePhone(currentClaim.suggestedPhone);
-
-        if (text === '1' && isValidPhone(suggestedPhone)) {
-          updateLightingContext(userId, { phone: suggestedPhone });
-          return continueAfterCorrectionOrNext(
-            userId,
-            FLOW_STATES.LIGHTING_WAIT_DNI,
-            dniRequestMessage(),
-            'Teléfono actualizado.'
-          );
-        }
-
-        if (text === '2') {
-          setState(userId, FLOW_STATES.LIGHTING_WAIT_PHONE);
-          return phoneRequestMessage();
-        }
-
-        return retryMessage(phoneSuggestionMessage(suggestedPhone || 'No disponible'));
-      }
 
       case FLOW_STATES.LIGHTING_WAIT_PHONE:
         if (!isValidPhone(text)) {

@@ -471,8 +471,11 @@ function operatorContactMessage() {
   return [
     bold('Su consulta será derivada a una oficial de atención al vecino.'),
     '',
+    bold('Horario de atención:'),
+    'Lunes a viernes de 07:00 a 19:00 hs',
+    '',
     'Una agente revisará su mensaje y responderá por este mismo medio.',
-    italic('Debido a la cantidad de consultas, la respuesta puede demorar.'),
+    'La respuesta puede demorar según la cantidad de consultas recibidas.',
     '',
     bold('Recuerde que:'),
     '- Los reclamos se cargan en MuniDigital',
