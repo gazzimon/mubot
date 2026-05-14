@@ -40,6 +40,7 @@ const STATES = {
   REGISTER_HELP: 'REGISTER_HELP',
   CLAIM_TUTORIAL: 'CLAIM_TUTORIAL',
   SYSTEM_PROBLEM: 'SYSTEM_PROBLEM',
+  OPERATOR_SUPPORT_MENU: 'OPERATOR_SUPPORT_MENU',
   PHONE_SUPPORT: 'PHONE_SUPPORT',
   OPERATOR_CONTACT: 'OPERATOR_CONTACT',
   FALLBACK: 'FALLBACK'
@@ -455,6 +456,17 @@ function phoneSupportMessage() {
   ].join('\n');
 }
 
+function operatorSupportMenuMessage() {
+  return [
+    bold('Elija el tipo de atención que necesita:'),
+    '',
+    '1. Atención telefónica',
+    '2. Chatear con un representante de atención al cliente',
+    '',
+    `Escriba ${underline('MENU')} para volver al menu principal.`
+  ].join('\n');
+}
+
 function operatorContactMessage() {
   return [
     bold('Su consulta será derivada a una oficial de atención al vecino.'),
@@ -559,6 +571,8 @@ async function processMessage(userId, rawText, options = {}) {
       return handleClaimNew(userId, text);
     case STATES.MUNIDIGITAL_HELP:
       return handleMuniDigitalHelp(userId, text);
+    case STATES.OPERATOR_SUPPORT_MENU:
+      return handleOperatorSupportMenu(userId, text, channel);
     case STATES.OPERATOR_CONTACT:
       return handleOperatorContact(userId, text, channel);
     default:
@@ -576,18 +590,8 @@ function handleMainMenu(userId, text, channel) {
       setState(userId, STATES.MUNIDIGITAL_HELP);
       return muniDigitalHelpMessage();
     case '3':
-      setState(userId, STATES.PHONE_SUPPORT);
-      return phoneSupportMessage();
-    case '4':
-      operatorQueue.push({
-        userId,
-        createdAt: new Date().toISOString(),
-        reason: 'operator_requested_from_main_menu',
-        channel
-      });
-      persistRuntimeStore();
-      setState(userId, STATES.OPERATOR_CONTACT);
-      return operatorContactMessage();
+      setState(userId, STATES.OPERATOR_SUPPORT_MENU);
+      return operatorSupportMenuMessage();
     default:
       return retryMessage(showMainMenu());
   }
@@ -619,6 +623,30 @@ function handleMuniDigitalHelp(userId, text) {
       return systemProblemMessage();
     default:
       return retryMessage(muniDigitalHelpMessage());
+  }
+}
+
+function startOperatorContact(userId, channel, reason) {
+  operatorQueue.push({
+    userId,
+    createdAt: new Date().toISOString(),
+    reason,
+    channel
+  });
+  persistRuntimeStore();
+  setState(userId, STATES.OPERATOR_CONTACT);
+  return operatorContactMessage();
+}
+
+function handleOperatorSupportMenu(userId, text, channel) {
+  switch (text) {
+    case '1':
+      setState(userId, STATES.PHONE_SUPPORT);
+      return phoneSupportMessage();
+    case '2':
+      return startOperatorContact(userId, channel, 'operator_requested_from_support_menu');
+    default:
+      return retryMessage(operatorSupportMenuMessage());
   }
 }
 
