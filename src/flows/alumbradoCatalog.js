@@ -47,7 +47,7 @@ const CATALOGS = {
       {
         ...BASE_SERVICE_AREAS[0],
         enabled: true,
-        areaServicioId: 7868,
+        areaServicioId: 6878,
         prioridadId: 1,
         origenId: 156,
         incidentTypes: [

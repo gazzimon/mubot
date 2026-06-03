@@ -107,6 +107,16 @@ function createMuniDigitalClient(options = {}) {
       throw error;
     }
 
+    if (parsedBody && typeof parsedBody === 'object' && parsedBody.status === 'fail') {
+      const message = parsedBody.exceptionMessage
+        ? `MuniDigital rechazo el reclamo: ${parsedBody.exceptionMessage}`
+        : 'MuniDigital rechazo el reclamo';
+      const error = new Error(message);
+      error.status = response.status;
+      error.responseBody = parsedBody;
+      throw error;
+    }
+
     return {
       ok: true,
       status: response.status,
