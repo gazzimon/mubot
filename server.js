@@ -872,8 +872,8 @@ function buildAdminLightingPayload(input = {}) {
     'Reclamo generado desde endpoint admin de prueba.'
   ].filter(Boolean).join(' ');
 
-  const areaServicioId = MUNIDIGITAL_ENV === 'PROD' ? 6878 : 7916;
-  const origenId = MUNIDIGITAL_ENV === 'PROD' ? null : 149;
+  const areaServicioId = MUNIDIGITAL_ENV === 'PROD' ? 7868 : 7916;
+  const origenId = MUNIDIGITAL_ENV === 'PROD' ? 156 : 149;
 
   return {
     direccion,
