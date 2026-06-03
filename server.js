@@ -1,6 +1,8 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
+const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 const { createFlowHelpers } = require('./src/flows/alumbradoFlow');
 const { createMuniDigitalClient } = require('./src/services/munidigitalClient');
@@ -31,6 +33,8 @@ const MUNIDIGITAL_ACCESS = process.env.MUNIDIGITAL_ACCESS || '';
 const MUNIDIGITAL_SECRET = process.env.MUNIDIGITAL_SECRET || '';
 const MUNIDIGITAL_TIMEOUT_MS = Number(process.env.MUNIDIGITAL_TIMEOUT_MS || '30000');
 const OPERATOR_CONTACT_TIMEOUT_MINUTES = Number(process.env.OPERATOR_CONTACT_TIMEOUT_MINUTES || '15');
+const WEBHOOK_TOKEN = process.env.WEBHOOK_TOKEN || '';
+const SESSION_TTL_DAYS = Number(process.env.SESSION_TTL_DAYS || '30');
 
 const STATES = {
   WELCOME: 'WELCOME',
@@ -50,7 +54,6 @@ validateRuntimeConfig();
 
 const runtimeStore = loadRuntimeStore(DATA_FILE_PATH);
 const sessions = new Map(runtimeStore.sessions.map((session) => [session.userId, session]));
-const reiterations = runtimeStore.reiterations;
 const operatorQueue = runtimeStore.operatorQueue;
 
 const whatsappRuntime = {
@@ -61,6 +64,16 @@ const whatsappRuntime = {
   lastClientEvent: null,
   client: null
 };
+
+let reconnectAttempts = 0;
+
+const webhookLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Demasiadas solicitudes. Intente nuevamente en un minuto.' }
+});
 
 const muniDigitalClient = createMuniDigitalClient({
   baseUrl: MUNIDIGITAL_BASE_URL,
@@ -227,13 +240,16 @@ function validateRuntimeConfig() {
   if (ADMIN_DEBUG_ENABLED && !ADMIN_TOKEN) {
     throw new Error('ADMIN_TOKEN es obligatorio cuando ADMIN_DEBUG_ENABLED no es false.');
   }
+
+  if (!WEBHOOK_TOKEN) {
+    throw new Error('WEBHOOK_TOKEN es obligatorio.');
+  }
 }
 
 function loadRuntimeStore(filePath) {
   if (!fs.existsSync(filePath)) {
     return {
       sessions: [],
-      reiterations: [],
       operatorQueue: []
     };
   }
@@ -243,7 +259,6 @@ function loadRuntimeStore(filePath) {
     const parsed = JSON.parse(raw);
     return {
       sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
-      reiterations: Array.isArray(parsed.reiterations) ? parsed.reiterations : [],
       operatorQueue: Array.isArray(parsed.operatorQueue) ? parsed.operatorQueue : []
     };
   } catch (error) {
@@ -251,17 +266,74 @@ function loadRuntimeStore(filePath) {
   }
 }
 
+let persistScheduled = false;
+
 function persistRuntimeStore() {
-  const directory = path.dirname(DATA_FILE_PATH);
-  fs.mkdirSync(directory, { recursive: true });
+  if (persistScheduled) {
+    return;
+  }
 
-  const payload = {
-    sessions: Array.from(sessions.values()),
-    reiterations,
-    operatorQueue
-  };
+  persistScheduled = true;
+  setImmediate(() => {
+    persistScheduled = false;
+    const directory = path.dirname(DATA_FILE_PATH);
+    fs.mkdirSync(directory, { recursive: true });
+    const payload = {
+      sessions: Array.from(sessions.values()),
+      operatorQueue
+    };
+    fs.writeFile(DATA_FILE_PATH, JSON.stringify(payload, null, 2), 'utf8', (err) => {
+      if (err) {
+        console.error('Error persistiendo datos:', err);
+      }
+    });
+  });
+}
 
-  fs.writeFileSync(DATA_FILE_PATH, JSON.stringify(payload, null, 2), 'utf8');
+function cleanupStaleSessions() {
+  if (!Number.isFinite(SESSION_TTL_DAYS) || SESSION_TTL_DAYS <= 0) {
+    return;
+  }
+
+  const cutoff = Date.now() - SESSION_TTL_DAYS * 24 * 60 * 60 * 1000;
+  let removed = 0;
+  for (const [userId, session] of sessions) {
+    const lastActivity = Date.parse(session.updatedAt || session.createdAt || '');
+    if (!Number.isNaN(lastActivity) && lastActivity < cutoff) {
+      sessions.delete(userId);
+      removed++;
+    }
+  }
+
+  if (removed > 0) {
+    console.log(`Limpieza de sesiones: ${removed} sesion(es) eliminada(s) por inactividad.`);
+    persistRuntimeStore();
+  }
+}
+
+function scheduleWhatsAppReconnect() {
+  const MAX_RECONNECT_ATTEMPTS = 5;
+  if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+    console.error(`Se alcanzó el máximo de reconexiones (${MAX_RECONNECT_ATTEMPTS}). Reinicie el proceso manualmente.`);
+    return;
+  }
+
+  reconnectAttempts++;
+  const delayMs = Math.min(5000 * Math.pow(2, reconnectAttempts - 1), 60000);
+  console.log(`Reconectando WhatsApp en ${Math.round(delayMs / 1000)}s (intento ${reconnectAttempts}/5)...`);
+
+  setTimeout(async () => {
+    try {
+      await closeWhatsAppClient();
+    } catch (error) {
+      console.error('Error cerrando cliente anterior al reconectar:', error);
+    }
+
+    startWhatsAppBridge().catch((error) => {
+      whatsappRuntime.status = 'boot_error';
+      console.error('Error al reconectar WhatsApp:', error);
+    });
+  }, delayMs);
 }
 
 function findBrowserExecutable() {
@@ -346,10 +418,6 @@ function replyMediaType(reply) {
   return normalizeInput(reply.mediaType);
 }
 
-function buildRegisterHelpReply(text) {
-  return text;
-}
-
 function welcomeMessage() {
   return showMainMenu();
 }
@@ -399,7 +467,7 @@ function registerHelpMessage() {
     `Escriba ${underline('MENU')} para volver al menu principal.`
   ].join('\n');
 
-  return buildRegisterHelpReply(text);
+  return text;
 }
 
 function claimTutorialMessage() {
@@ -678,6 +746,16 @@ function summarizeBodyForLogs(text) {
   return `bodyLength=${text.length}`;
 }
 
+function timingSafeEqual(a, b) {
+  const bufA = Buffer.from(String(a));
+  const bufB = Buffer.from(String(b));
+  if (bufA.length !== bufB.length) {
+    crypto.timingSafeEqual(bufA, Buffer.alloc(bufA.length));
+    return false;
+  }
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
 function adminAuthMiddleware(req, res, next) {
   if (!ADMIN_DEBUG_ENABLED) {
     return res.status(404).json({ error: 'Ruta no disponible' });
@@ -688,7 +766,7 @@ function adminAuthMiddleware(req, res, next) {
     return res.status(401).json({ error: `Falta header ${ADMIN_TOKEN_HEADER}` });
   }
 
-  if (token !== ADMIN_TOKEN) {
+  if (!timingSafeEqual(token, ADMIN_TOKEN)) {
     return res.status(403).json({ error: 'Token admin invalido' });
   }
 
@@ -705,6 +783,19 @@ function adminTestRouteMiddleware(req, res, next) {
   }
 
   return adminAuthMiddleware(req, res, next);
+}
+
+function webhookAuthMiddleware(req, res, next) {
+  const token = normalizeInput(req.header('x-webhook-token'));
+  if (!token) {
+    return res.status(401).json({ error: 'Falta header x-webhook-token' });
+  }
+
+  if (!timingSafeEqual(token, WEBHOOK_TOKEN)) {
+    return res.status(403).json({ error: 'Token webhook invalido' });
+  }
+
+  return next();
 }
 
 function sanitizeMuniDigitalBody(body) {
@@ -903,6 +994,7 @@ async function startWhatsAppBridge() {
   });
 
   client.on('ready', () => {
+    reconnectAttempts = 0;
     whatsappRuntime.status = 'connected';
     if (readyTimeout) {
       clearTimeout(readyTimeout);
@@ -955,6 +1047,7 @@ async function startWhatsAppBridge() {
       reason: String(reason)
     });
     console.error(`WhatsApp desconectado: ${reason}`);
+    scheduleWhatsAppReconnect();
   });
 
   client.on('message', async (incoming) => {
@@ -1007,7 +1100,7 @@ async function startWhatsAppBridge() {
   await client.initialize();
 }
 
-app.post('/webhook/message', async (req, res) => {
+app.post('/webhook/message', webhookLimiter, webhookAuthMiddleware, async (req, res) => {
   try {
     const userId = normalizeInput(req.body.userId);
     const message = normalizeInput(req.body.message);
@@ -1041,7 +1134,7 @@ app.post('/webhook/message', async (req, res) => {
   }
 });
 
-app.post('/webhook/start', (req, res) => {
+app.post('/webhook/start', webhookLimiter, webhookAuthMiddleware, (req, res) => {
   try {
     const userId = normalizeInput(req.body.userId);
     if (!userId) {
@@ -1066,10 +1159,17 @@ app.post('/webhook/start', (req, res) => {
   }
 });
 
+app.get('/health', (_req, res) => {
+  res.json({
+    ok: true,
+    uptime: Math.floor(process.uptime()),
+    whatsapp: whatsappRuntime.status
+  });
+});
+
 app.get('/admin/debug', adminAuthMiddleware, (_req, res) => {
   res.json({
     sessions: Array.from(sessions.values()),
-    reiterations,
     operatorQueue,
     whatsapp: {
       enabled: whatsappRuntime.enabled,
@@ -1203,3 +1303,5 @@ startWhatsAppBridge().catch((error) => {
   whatsappRuntime.status = 'boot_error';
   console.error('No se pudo iniciar el puente de WhatsApp:', error);
 });
+
+setInterval(cleanupStaleSessions, 6 * 60 * 60 * 1000).unref();
