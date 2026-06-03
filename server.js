@@ -32,7 +32,8 @@ const MUNIDIGITAL_BASE_URL = process.env.MUNIDIGITAL_BASE_URL || defaultMuniDigi
 const MUNIDIGITAL_ACCESS = process.env.MUNIDIGITAL_ACCESS || '';
 const MUNIDIGITAL_SECRET = process.env.MUNIDIGITAL_SECRET || '';
 const MUNIDIGITAL_TIMEOUT_MS = Number(process.env.MUNIDIGITAL_TIMEOUT_MS || '30000');
-const OPERATOR_CONTACT_TIMEOUT_MINUTES = Number(process.env.OPERATOR_CONTACT_TIMEOUT_MINUTES || '15');
+const OPERATOR_CONTACT_TIMEOUT_MINUTES = Number(process.env.OPERATOR_CONTACT_TIMEOUT_MINUTES || '60');
+const CLAIM_FLOW_TIMEOUT_HOURS = Number(process.env.CLAIM_FLOW_TIMEOUT_HOURS || '24');
 const WEBHOOK_TOKEN = process.env.WEBHOOK_TOKEN || '';
 const SESSION_TTL_DAYS = Number(process.env.SESSION_TTL_DAYS || '30');
 
@@ -588,6 +589,28 @@ function isOperatorContactExpired(session) {
   return Date.now() - lastActivityAt >= timeoutMs;
 }
 
+function isClaimFlowExpired(session) {
+  if (!lightingFlow.isLightingState(session.state)) {
+    return false;
+  }
+
+  if (session.state === ALUMBRADO_FLOW_STATES.LIGHTING_SUBMITTED) {
+    return false;
+  }
+
+  if (!Number.isFinite(CLAIM_FLOW_TIMEOUT_HOURS) || CLAIM_FLOW_TIMEOUT_HOURS <= 0) {
+    return false;
+  }
+
+  const lastActivityAt = Date.parse(session.updatedAt || session.createdAt || '');
+  if (Number.isNaN(lastActivityAt)) {
+    return false;
+  }
+
+  const timeoutMs = CLAIM_FLOW_TIMEOUT_HOURS * 60 * 60 * 1000;
+  return Date.now() - lastActivityAt >= timeoutMs;
+}
+
 function operatorContactExpiredMessage() {
   return [
     bold('La conversación con la oficial de atención finalizó por inactividad.'),
@@ -599,6 +622,20 @@ function operatorContactExpiredMessage() {
       'Elija una opción del menú o escriba ',
       underline('MENU'),
       ' para volver a verlo.'
+    ])
+  ].join('\n');
+}
+
+function claimFlowExpiredMessage() {
+  return [
+    bold('El reclamo que estaba cargando fue descartado por inactividad.'),
+    '',
+    'Los datos ingresados no fueron enviados a MuniDigital.',
+    '',
+    joinFormattedText([
+      'Si desea iniciar un nuevo reclamo, escriba ',
+      underline('MENU'),
+      '.'
     ])
   ].join('\n');
 }
@@ -621,6 +658,12 @@ async function processMessage(userId, rawText, options = {}) {
   if (isOperatorContactExpired(session)) {
     setState(userId, STATES.MAIN_MENU);
     return operatorContactExpiredMessage();
+  }
+
+  if (isClaimFlowExpired(session)) {
+    lightingFlow.clearLightingContext(userId);
+    setState(userId, STATES.MAIN_MENU);
+    return claimFlowExpiredMessage();
   }
 
   if (shouldReturnToMenuOnNextMessage(session.state)) {

@@ -1070,7 +1070,8 @@ function createFlowHelpers(dependencies) {
     FLOW_STATES,
     isLightingState,
     lightingIntroMessage,
-    handleLightingFlow
+    handleLightingFlow,
+    clearLightingContext
   };
 }
 
